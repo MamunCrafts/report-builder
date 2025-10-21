@@ -146,3 +146,63 @@ export async function fetchReportBuilderData(signal?: AbortSignal): Promise<Repo
 
   return payload.data as ReportBuilderData
 }
+
+export async function createCategory(
+  name: string,
+  description?: string,
+  signal?: AbortSignal,
+): Promise<ApiCategory> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/create-category`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      description: description ?? '',
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to create category (status ${response.status}).`)
+  }
+
+  const payload = await response.json()
+
+  if (!payload?.success) {
+    throw new Error(payload?.message ?? 'Unexpected create category API response.')
+  }
+
+  return payload.data as ApiCategory
+}
+
+export async function createReport(
+  categoryId: string,
+  name: string,
+  number?: string,
+  description?: string,
+  signal?: AbortSignal,
+): Promise<ApiReport> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/create-report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      categoryId,
+      name,
+      number: number ?? '',
+      description: description ?? '',
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to create report (status ${response.status}).`)
+  }
+
+  const payload = await response.json()
+
+  if (!payload?.success) {
+    throw new Error(payload?.message ?? 'Unexpected create report API response.')
+  }
+
+  return payload.data as ApiReport
+}

@@ -15,7 +15,7 @@ export default function SectionCard({ title,  children, step }: SectionCardProps
       <div className="flex items-center justify-between gap-4 pb-6">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-3">
-            {typeof step === 'number' && <StepBadge step={step} />}
+            {/* {typeof step === 'number' && <StepBadge step={step} />} */}
             <h2 className="text-xl font-semibold text-white sm:text-2xl">{title}</h2>
           </div>
           {/* {description && <p className="text-sm text-slate-400">{description}</p>} */}

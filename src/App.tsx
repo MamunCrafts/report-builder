@@ -12,10 +12,11 @@ import {
   fetchReportBuilderData,
   fetchCategories,
   fetchDatabaseTables,
-  fetchTableFields, // ADD THIS IMPORT
+  fetchTableFields,
+  createCategory,
+  createReport,
   type ReportBuilderData,
   type ApiDatabaseTable,
-
 } from './api/reportBuilder.ts'
 import type { Category } from './types'
 
@@ -47,6 +48,9 @@ function App() {
   const [isTableFieldsLoading, setIsTableFieldsLoading] = useState(false)
   const [joinQuery, setJoinQuery] = useState<string>('')
   const [joinedTableFields, setJoinedTableFields] = useState<string[]>([])
+  const [isCreatingNewReport, setIsCreatingNewReport] = useState<boolean>(false)
+  const [newCategoryName, setNewCategoryName] = useState<string>('')
+  const [newReportName, setNewReportName] = useState<string>('')
 
   const dateFormatter = useMemo(
     () =>
@@ -387,6 +391,38 @@ function App() {
     setShowJoinSections((current) => !current)
   }
 
+  const handleCreateNewReport = async () => {
+    if (!newCategoryName.trim() || !newReportName.trim()) {
+      setError('Please enter both category name and report name.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Create new category
+      const newCategory = await createCategory(newCategoryName.trim())
+
+      // Create new report in the category
+      await createReport(newCategory.id, newReportName.trim())
+
+      // Reload categories and data
+      const updatedCategories = await fetchCategories()
+      setCategories(updatedCategories)
+      setSelectedCategoryId(newCategory.id)
+
+      // Reset form
+      setIsCreatingNewReport(false)
+      setNewCategoryName('')
+      setNewReportName('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create report.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Parse table names from JOIN query and fetch their fields
   useEffect(() => {
     const parseAndFetchJoinedTableFields = async () => {
@@ -463,11 +499,71 @@ function App() {
           onCategorySelect={setSelectedCategoryId}
         />
 
-        <SectionCard
-          step={2}
-          title={`Category Reports: ${selectedCategory?.name ?? 'Select a category'}`}
-          description="Review existing reports or manage them directly."
-        >
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setIsCreatingNewReport(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/30 transition hover:bg-green-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          >
+            + New Report
+          </button>
+        </div>
+
+        {isCreatingNewReport && (
+          <SectionCard
+            step={1}
+            title="Create New Report"
+            description="Enter details for your new report category and name."
+          >
+            <div className="space-y-6">
+              <FieldGroup label="New Category Name">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Enter category name"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                />
+              </FieldGroup>
+              <FieldGroup label="Report Name">
+                <input
+                  type="text"
+                  value={newReportName}
+                  onChange={(e) => setNewReportName(e.target.value)}
+                  placeholder="Enter report name"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                />
+              </FieldGroup>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreatingNewReport(false)
+                    setNewCategoryName('')
+                    setNewReportName('')
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateNewReport}
+                  className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </SectionCard>
+        )}
+
+        {!isCreatingNewReport && (
+          <SectionCard
+            step={2}
+            title={`Category Reports: ${selectedCategory?.name ?? 'Select a category'}`}
+            description="Review existing reports or manage them directly."
+          >
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40">
             <table className="min-w-full divide-y divide-slate-800 text-sm">
               <thead className="bg-slate-900/80 text-slate-400">
@@ -549,7 +645,8 @@ function App() {
               </tbody>
             </table>
           </div>
-        </SectionCard>
+          </SectionCard>
+        )}
 
         <SectionCard
           step={3}
