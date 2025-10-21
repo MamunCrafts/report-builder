@@ -288,6 +288,211 @@ app.get('/api/data-sources/:name/fields', async (req, res) => {
   }
 })
 
+app.post('/api/v1/save-report-configuration', async (req, res) => {
+  try {
+    const { categoryName, reportName, configuration } = req.body
+
+    if (!categoryName || !reportName || !configuration) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: categoryName, reportName, or configuration.',
+      })
+    }
+
+    const connection = await pool.getConnection()
+
+    try {
+      // Start transaction
+      await connection.beginTransaction()
+
+      // Check if category exists, if not create it
+      const [categoryRows] = await connection.query(
+        'SELECT id FROM categories WHERE name = ?',
+        [categoryName],
+      )
+
+      let categoryId
+      if (categoryRows.length > 0) {
+        categoryId = categoryRows[0].id
+      } else {
+        // Create new category
+        const [categoryResult] = await connection.query(
+          'INSERT INTO categories (name, description, display_order) VALUES (?, ?, ?)',
+          [categoryName, `Category: ${categoryName}`, 0],
+        )
+        categoryId = categoryResult.insertId
+      }
+
+      // Create new report
+      const [reportResult] = await connection.query(
+        'INSERT INTO reports (category_id, name, report_number, description, status, version) VALUES (?, ?, ?, ?, ?, ?)',
+        [categoryId, reportName, `RPT-${Date.now()}`, `Report: ${reportName}`, 'active', 1],
+      )
+      const reportId = reportResult.insertId
+
+      // Save report configuration
+      const configurationJson = JSON.stringify(configuration)
+      await connection.query(
+        `INSERT INTO report_configurations 
+         (report_id, data_source, selected_fields, print_order_fields, summary_fields, 
+          filter_conditions, aggregate_filters, sort_fields, sort_orders, 
+          joined_available_fields, joined_print_order_fields)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          reportId,
+          configuration.dataSource || '',
+          JSON.stringify(configuration.selectedFields || []),
+          JSON.stringify(configuration.printOrderFields || []),
+          JSON.stringify(configuration.summaryFields || []),
+          JSON.stringify(configuration.filterConditions || []),
+          JSON.stringify(configuration.aggregateFilters || []),
+          JSON.stringify(configuration.sortFields || []),
+          JSON.stringify(configuration.sortOrders || []),
+          JSON.stringify(configuration.joinedAvailableFields || []),
+          JSON.stringify(configuration.joinedPrintOrderFields || []),
+        ],
+      )
+
+      // Commit transaction
+      await connection.commit()
+
+      res.json({
+        success: true,
+        message: 'Report configuration saved successfully.',
+        data: {
+          reportId: String(reportId),
+          reportName: reportName,
+          categoryId: String(categoryId),
+          createdAt: new Date().toISOString(),
+        },
+      })
+    } catch (transactionError) {
+      await connection.rollback()
+      throw transactionError
+    } finally {
+      connection.release()
+    }
+  } catch (error) {
+    console.error('Failed to save report configuration', error)
+    res.status(500).json({
+      success: false,
+      message: 'Unable to save report configuration.',
+      error: error.message,
+    })
+  }
+})
+
+app.get('/api/v1/report-configuration/:reportId', async (req, res) => {
+  try {
+    const { reportId } = req.params
+
+    const [rows] = await pool.query(
+      `SELECT data_source, selected_fields, print_order_fields, summary_fields,
+              filter_conditions, aggregate_filters, sort_fields, sort_orders,
+              joined_available_fields, joined_print_order_fields
+         FROM report_configurations
+         WHERE report_id = ?`,
+      [reportId],
+    )
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report configuration not found.',
+      })
+    }
+
+    const config = rows[0]
+    const configuration = {
+      dataSource: config.data_source,
+      dataSourceLabel: '',
+      selectedTables: [],
+      selectedFields: parseJsonColumn(config.selected_fields, []),
+      printOrderFields: parseJsonColumn(config.print_order_fields, []),
+      summaryFields: parseJsonColumn(config.summary_fields, []),
+      sortFields: parseJsonColumn(config.sort_fields, []),
+      sortOrders: parseJsonColumn(config.sort_orders, []),
+      filterConditions: parseJsonColumn(config.filter_conditions, []),
+      groupByFields: [],
+      aggregateFilters: parseJsonColumn(config.aggregate_filters, []),
+      joinQuery: '',
+      joinedAvailableFields: parseJsonColumn(config.joined_available_fields, []),
+      joinedPrintOrderFields: parseJsonColumn(config.joined_print_order_fields, []),
+      joinedGroupByFields: [],
+      joinedAggregateFilters: [],
+    }
+
+    res.json({
+      success: true,
+      data: { configuration },
+    })
+  } catch (error) {
+    console.error('Failed to fetch report configuration', error)
+    res.status(500).json({
+      success: false,
+      message: 'Unable to fetch report configuration.',
+    })
+  }
+})
+
+app.put('/api/v1/report-configuration/:reportId', async (req, res) => {
+  try {
+    const { reportId } = req.params
+    const { configuration } = req.body
+
+    if (!configuration) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required field: configuration.',
+      })
+    }
+
+    const [result] = await pool.query(
+      `UPDATE report_configurations 
+       SET data_source = ?, selected_fields = ?, print_order_fields = ?, summary_fields = ?,
+           filter_conditions = ?, aggregate_filters = ?, sort_fields = ?, sort_orders = ?,
+           joined_available_fields = ?, joined_print_order_fields = ?
+       WHERE report_id = ?`,
+      [
+        configuration.dataSource || '',
+        JSON.stringify(configuration.selectedFields || []),
+        JSON.stringify(configuration.printOrderFields || []),
+        JSON.stringify(configuration.summaryFields || []),
+        JSON.stringify(configuration.filterConditions || []),
+        JSON.stringify(configuration.aggregateFilters || []),
+        JSON.stringify(configuration.sortFields || []),
+        JSON.stringify(configuration.sortOrders || []),
+        JSON.stringify(configuration.joinedAvailableFields || []),
+        JSON.stringify(configuration.joinedPrintOrderFields || []),
+        reportId,
+      ],
+    )
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report configuration not found.',
+      })
+    }
+
+    res.json({
+      success: true,
+      message: 'Report configuration updated successfully.',
+      data: {
+        reportId: reportId,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+  } catch (error) {
+    console.error('Failed to update report configuration', error)
+    res.status(500).json({
+      success: false,
+      message: 'Unable to update report configuration.',
+      error: error.message,
+    })
+  }
+})
+
 app.use(express.static(staticDir))
 
 app.use((_req, res) => {

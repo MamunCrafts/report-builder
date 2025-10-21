@@ -13,8 +13,10 @@ import {
   fetchCategories,
   fetchDatabaseTables,
   fetchTableFields,
+  saveReportConfiguration,
   type ReportBuilderData,
   type ApiDatabaseTable,
+  type ReportBuilderConfiguration,
 } from './api/reportBuilder.ts'
 import type { Category } from './types'
 
@@ -377,6 +379,62 @@ function App() {
       setIsCreatingNewReport(false)
       setNewCategoryName('')
       setNewReportName('')
+    }
+  }
+
+  const handleSaveReport = async () => {
+    if (!newCategoryName.trim() || !newReportName.trim()) {
+      setError('Please enter both category name and report name.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Build configuration from current state
+      const configuration: ReportBuilderConfiguration = {
+        dataSource: selectedTable?.name ?? '',
+        dataSourceLabel: selectedTable?.label ?? '',
+        selectedTables: selectedTable ? [selectedTable.name] : [],
+        selectedFields: printFields,
+        printOrderFields: printFields,
+        summaryFields: sumFields,
+        sortFields: [], // TODO: Add sort field state
+        sortOrders: [], // TODO: Add sort order state
+        filterConditions: filterConditions,
+        groupByFields: [], // TODO: Add grouping state
+        aggregateFilters: aggregateFilters,
+        joinQuery: joinQuery,
+        joinedAvailableFields: joinedTableFields,
+        joinedPrintOrderFields: joinedPrintFields,
+        joinedGroupByFields: [], // TODO: Add joined grouping state
+        joinedAggregateFilters: joinedAggregateFilters,
+      }
+
+      // Save report configuration
+      await saveReportConfiguration(
+        newCategoryName.trim(),
+        newReportName.trim(),
+        configuration,
+      )
+
+      // Show success message
+      setError(null)
+      alert(`Report "${newReportName}" created successfully!`)
+
+      // Reset form
+      setNewCategoryName('')
+      setNewReportName('')
+      setIsCreatingNewReport(false)
+
+      // Reload categories
+      const updatedCategories = await fetchCategories()
+      setCategories(updatedCategories)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save report.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1072,6 +1130,7 @@ function App() {
             </p>
             <button
               type="button"
+              onClick={handleSaveReport}
               className="inline-flex items-center gap-3 rounded-lg bg-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               Save Report

@@ -20,17 +20,56 @@ export type ApiReport = {
 }
 
 export type ReportBuilderConfiguration = {
+  // Step 3: Data Source
   dataSource: string
   dataSourceLabel: string
+  selectedTables: string[]
+  
+  // Step 4: Select Fields & Print Order
   selectedFields: string[]
   printOrderFields: string[]
+  
+  // Step 5: Select Fields to Sum
   summaryFields: string[]
-  filterConditions: Array<{ field: string; operator: string; value: string }>
-  aggregateFilters: Array<{ field: string; operator: string; value: string }>
+  
+  // Step 6: Select Sort
   sortFields: string[]
   sortOrders: string[]
+  
+  // Step 7: Select Filters
+  filterConditions: Array<{ field: string; operator: string; value: string }>
+  
+  // Step 8: Grouping & Summarization
+  groupByFields: string[]
+  
+  // Step 9: Aggregate Filters (HAVING)
+  aggregateFilters: Array<{ field: string; operator: string; value: string }>
+  
+  // Step 10: Manual Join Query (Optional)
+  joinQuery: string
+  
+  // Step 11-13: Joined Data sections
   joinedAvailableFields: string[]
   joinedPrintOrderFields: string[]
+  joinedGroupByFields: string[]
+  joinedAggregateFilters: Array<{ field: string; operator: string; value: string }>
+}
+
+export type SaveReportConfigurationRequest = {
+  categoryName: string
+  reportName: string
+  configuration: ReportBuilderConfiguration
+}
+
+export type SaveReportConfigurationResponse = {
+  success: boolean
+  message: string
+  data?: {
+    reportId: string
+    reportName: string
+    categoryId: string
+    createdAt: string
+  }
 }
 
 export type ReportBuilderData = {
@@ -205,4 +244,109 @@ export async function createReport(
   }
 
   return payload.data as ApiReport
+}
+
+export async function saveReportConfiguration(
+  categoryName: string,
+  reportName: string,
+  configuration: ReportBuilderConfiguration,
+  signal?: AbortSignal,
+): Promise<SaveReportConfigurationResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/save-report-configuration`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        categoryName,
+        reportName,
+        configuration,
+      }),
+      signal,
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.warn('Save report configuration endpoint not found (404). Endpoint needs to be created on backend.')
+        throw new Error(
+          'Backend endpoint /api/v1/save-report-configuration not implemented yet. Please contact your administrator.'
+        )
+      }
+      throw new Error(
+        `Failed to save report configuration (status ${response.status}).`,
+      )
+    }
+
+    const payload = await response.json()
+
+    if (!payload?.success) {
+      throw new Error(
+        payload?.message ?? 'Unexpected save report configuration API response.',
+      )
+    }
+
+    return payload as SaveReportConfigurationResponse
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error
+    }
+    throw error
+  }
+}
+
+export async function getReportConfiguration(
+  reportId: string,
+  signal?: AbortSignal,
+): Promise<{ configuration: ReportBuilderConfiguration }> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/report-configuration/${encodeURIComponent(reportId)}`,
+    { signal },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch report configuration (status ${response.status}).`,
+    )
+  }
+
+  const payload = await response.json()
+
+  if (!payload?.success) {
+    throw new Error(
+      payload?.message ?? 'Unexpected get report configuration API response.',
+    )
+  }
+
+  return payload.data as { configuration: ReportBuilderConfiguration }
+}
+
+export async function updateReportConfiguration(
+  reportId: string,
+  configuration: ReportBuilderConfiguration,
+  signal?: AbortSignal,
+): Promise<SaveReportConfigurationResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/report-configuration/${encodeURIComponent(reportId)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ configuration }),
+      signal,
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to update report configuration (status ${response.status}).`,
+    )
+  }
+
+  const payload = await response.json()
+
+  if (!payload?.success) {
+    throw new Error(
+      payload?.message ?? 'Unexpected update report configuration API response.',
+    )
+  }
+
+  return payload as SaveReportConfigurationResponse
 }
