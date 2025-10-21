@@ -43,6 +43,8 @@ function App() {
   const [tableFields, setTableFields] = useState<string[]>([])
   const [tableFieldMap, setTableFieldMap] = useState<{ [tableName: string]: string[] }>({}) // cache
   const [isTableFieldsLoading, setIsTableFieldsLoading] = useState(false)
+  const [joinQuery, setJoinQuery] = useState<string>('')
+  const [joinedTableFields, setJoinedTableFields] = useState<string[]>([])
 
   const dateFormatter = useMemo(
     () =>
@@ -165,11 +167,11 @@ function App() {
         setSelectedTable(null)
         setPrintFields([])
         setSumFields([])
-        setJoinedPrintFields(normalizedData.defaultConfiguration.joinedPrintOrderFields ?? [])
-        setFilterConditions(normalizedData.defaultConfiguration.filterConditions ?? [])
-        setAggregateFilters(normalizedData.defaultConfiguration.aggregateFilters ?? [])
-        setSortFields(normalizedData.defaultConfiguration.sortFields ?? [])
-        setSortOrders(normalizedData.defaultConfiguration.sortOrders ?? [])
+        setJoinedPrintFields([])
+        setFilterConditions([{ field: '', operator: '', value: '' }])
+        setAggregateFilters([{ field: '', operator: '', value: '' }])
+        setSortFields([])
+        setSortOrders([])
       } catch (fetchError) {
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
           return
@@ -248,10 +250,14 @@ function App() {
     return tableFields
   }, [selectedTable, tableFields])
   
-  const joinedAvailableFields = useMemo(
-    () => data?.defaultConfiguration.joinedAvailableFields ?? [],
-    [data],
-  )
+  const joinedAvailableFields = useMemo(() => {
+    // If user has entered a JOIN query, use fields from those tables
+    if (joinedTableFields.length > 0) {
+      return joinedTableFields
+    }
+    // Otherwise use default configuration
+    return data?.defaultConfiguration.joinedAvailableFields ?? []
+  }, [data, joinedTableFields])
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId),
@@ -379,7 +385,54 @@ function App() {
     setShowJoinSections((current) => !current)
   }
 
+  // Parse table names from JOIN query and fetch their fields
+  useEffect(() => {
+    const parseAndFetchJoinedTableFields = async () => {
+      if (!joinQuery.trim()) {
+        setJoinedTableFields([])
+        return
+      }
 
+      // Extract table names from JOIN query
+      // Matches patterns like: JOIN TableName, FROM TableName, etc.
+      const tableNameRegex = /(?:JOIN|FROM)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi
+      const matches = [...joinQuery.matchAll(tableNameRegex)]
+      const tableNames = [...new Set(matches.map((match) => match[1]))]
+
+      if (tableNames.length === 0) {
+        setJoinedTableFields([])
+        return
+      }
+
+      try {
+        // Fetch fields for all tables found in the JOIN query
+        const fieldsPromises = tableNames.map(async (tableName) => {
+          // Check cache first
+          if (tableFieldMap[tableName]) {
+            return tableFieldMap[tableName]
+          }
+
+          // Fetch from API
+          const fields = await fetchTableFields(tableName)
+          const fieldNames = fields.map((f) => f.name)
+
+          // Update cache
+          setTableFieldMap((prev) => ({ ...prev, [tableName]: fieldNames }))
+
+          return fieldNames
+        })
+
+        const allFields = await Promise.all(fieldsPromises)
+        const combinedFields = [...new Set(allFields.flat())]
+        setJoinedTableFields(combinedFields)
+      } catch (err) {
+        console.error('Error fetching joined table fields:', err)
+        setJoinedTableFields([])
+      }
+    }
+
+    parseAndFetchJoinedTableFields()
+  }, [joinQuery, tableFieldMap])
 
   if (error) {
     return (
@@ -879,6 +932,8 @@ function App() {
             <div className="space-y-2">
               <textarea
                 rows={4}
+                value={joinQuery}
+                onChange={(e) => setJoinQuery(e.target.value)}
                 placeholder="LEFT JOIN Customer_Record cr ON Waste_Management_Data.customer = cr.customer_id"
                 className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
               />
@@ -907,7 +962,11 @@ function App() {
                   title="Available Fields"
                   items={availableJoinedFieldOptions}
                   onItemClick={handleAddJoinedField}
-                  emptyMessage="All joined fields are already selected."
+                  emptyMessage={
+                    joinQuery.trim()
+                      ? 'Enter table names in the JOIN query above to see available fields.'
+                      : 'All joined fields are already selected.'
+                  }
                 />
                 <ListPanel
                   title="Fields to Print (In Order)"
@@ -972,14 +1031,14 @@ function App() {
                   <SelectField
                     name="joined-group-by"
                     placeholder="Select group by field"
-                    options={['None', 'customer', 'supplier', 'location']}
+                    options={joinedAvailableFields}
                   />
                 </FieldGroup>
                 <FieldGroup label="Fields to Summarize">
                   <SelectField
                     name="joined-summary-field"
                     placeholder="Select field to summarize"
-                    options={sumFields.length > 0 ? sumFields : availableFields}
+                    options={joinedAvailableFields}
                   />
                 </FieldGroup>
                 <ActionButton label="Remove grouping rule" tone="danger">
