@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import toast, { Toaster } from 'react-hot-toast'
 import Header from './components/Header.tsx'
 import CategorySelection from './components/CategorySelection.tsx'
 import SectionCard from './components/SectionCard.tsx'
@@ -178,7 +179,9 @@ function App() {
           return
         }
         console.error(fetchError)
-        setError(fetchError instanceof Error ? fetchError.message : 'Failed to load data.')
+        const errorMessage = fetchError instanceof Error ? fetchError.message : 'Failed to load data.'
+        setError(errorMessage)
+        toast.error(errorMessage)
       } finally {
         // Ensure loader is visible for at least 800ms for better UX
         const minLoadTime = 800
@@ -384,7 +387,9 @@ function App() {
 
   const handleSaveReport = async () => {
     if (!newCategoryName.trim() || !newReportName.trim()) {
-      setError('Please enter both category name and report name.')
+      const errorMsg = 'Please enter both category name and report name.'
+      setError(errorMsg)
+      toast.error(errorMsg)
       return
     }
 
@@ -421,7 +426,7 @@ function App() {
 
       // Show success message
       setError(null)
-      alert(`Report "${newReportName}" created successfully!`)
+      toast.success(`Report "${newReportName}" created successfully!`)
 
       // Reset form
       setNewCategoryName('')
@@ -432,7 +437,9 @@ function App() {
       const updatedCategories = await fetchCategories()
       setCategories(updatedCategories)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save report.')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save report.'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -504,6 +511,7 @@ function App() {
   return (
     <>
       <GlobalLoader isLoading={loading} />
+      <Toaster position="bottom-right" reverseOrder={false} />
       <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_#1f284a55,_transparent_65%)] py-12 text-slate-200">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
         <Header />
