@@ -9,7 +9,7 @@ type SectionCardProps = {
   step?: number
 }
 
-export default function SectionCard({ title, description, children, footer, step }: SectionCardProps) {
+export default function SectionCard({ title,  children, step }: SectionCardProps) {
   return (
     <section className="rounded-3xl border border-slate-800/60 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40 sm:p-8">
       <div className="flex items-center justify-between gap-4 pb-6">
@@ -20,7 +20,6 @@ export default function SectionCard({ title, description, children, footer, step
           </div>
           {/* {description && <p className="text-sm text-slate-400">{description}</p>} */}
         </div>
-        <div className="hidden h-px flex-1 bg-gradient-to-r from-slate-800/80 via-slate-700/50 to-transparent sm:block" />
       </div>
       <div className="space-y-6">{children}</div>
       {/* {footer && <div className="mt-6 border-t border-slate-800/60 pt-6">{footer}</div>} */}

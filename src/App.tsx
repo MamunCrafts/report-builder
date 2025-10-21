@@ -15,7 +15,7 @@ import {
   fetchTableFields, // ADD THIS IMPORT
   type ReportBuilderData,
   type ApiDatabaseTable,
-  type ApiTableField, // ADD THIS IMPORT
+
 } from './api/reportBuilder.ts'
 import type { Category } from './types'
 
@@ -36,7 +36,9 @@ function App() {
   const [aggregateFilters, setAggregateFilters] = useState<
     Array<{ field: string; operator: string; value: string }>
   >([])
-  const [sortFields, setSortFields] = useState<string[]>([])
+  const [joinedAggregateFilters] = useState<
+    Array<{ field: string; operator: string; value: string }>
+  >([{ field: '', operator: '', value: '' }])
   const [sortOrders, setSortOrders] = useState<string[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -170,7 +172,7 @@ function App() {
         setJoinedPrintFields([])
         setFilterConditions([{ field: '', operator: '', value: '' }])
         setAggregateFilters([{ field: '', operator: '', value: '' }])
-        setSortFields([])
+  
         setSortOrders([])
       } catch (fetchError) {
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
@@ -251,13 +253,13 @@ function App() {
   }, [selectedTable, tableFields])
   
   const joinedAvailableFields = useMemo(() => {
-    // If user has entered a JOIN query, use fields from those tables
+    // Only show fields if user has entered a JOIN query
     if (joinedTableFields.length > 0) {
       return joinedTableFields
     }
-    // Otherwise use default configuration
-    return data?.defaultConfiguration.joinedAvailableFields ?? []
-  }, [data, joinedTableFields])
+    // Otherwise return empty array until JOIN query is entered
+    return []
+  }, [joinedTableFields])
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId),
@@ -1062,8 +1064,32 @@ function App() {
                 </div>
               }
             >
-              <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-6 text-center text-sm text-slate-500">
-                No aggregate filters have been defined for the joined data yet.
+              <div className="space-y-3">
+                {joinedAggregateFilters.map((condition, index) => (
+                  <div
+                    key={`${condition.field}-${index.toString()}-joined-agg`}
+                    className="grid gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),minmax(0,1fr),auto] md:items-center"
+                  >
+                    <SelectField
+                      name={`joined-aggregate-field-${index.toString()}`}
+                      placeholder="Select field"
+                      options={joinedAvailableFields}
+                    />
+                    <SelectField
+                      name={`joined-aggregate-operator-${index.toString()}`}
+                      placeholder="Select operator"
+                      options={['greater than', 'less than', 'equal to']}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Enter value"
+                      className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                    />
+                    <ActionButton label={`Remove joined aggregate filter ${index + 1}`} tone="danger">
+                      Remove
+                    </ActionButton>
+                  </div>
+                ))}
               </div>
             </SectionCard>
           </>
