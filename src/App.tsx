@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Header from './components/Header.tsx'
 import CategorySelection from './components/CategorySelection.tsx'
 import SectionCard from './components/SectionCard.tsx'
@@ -7,52 +7,291 @@ import SelectField from './components/SelectField.tsx'
 import ListPanel from './components/ListPanel.tsx'
 import ActionButton from './components/ActionButton.tsx'
 import IconButton from './components/IconButton.tsx'
+import GlobalLoader from './components/GlobalLoader.tsx'
 import {
-  categories,
-  reportCatalog,
-  availableTables,
-  availableFields,
-  printOrderFields,
-  summaryFields,
-  filterConditions,
-  aggregateFilters,
-  sortFields,
-  sortOrders,
-  joinedAvailableFields,
-  joinedPrintOrderFields,
-} from './data/mockData'
+  fetchReportBuilderData,
+  fetchCategories,
+  fetchDatabaseTables,
+  fetchTableFields, // ADD THIS IMPORT
+  type ReportBuilderData,
+  type ApiDatabaseTable,
+  type ApiTableField, // ADD THIS IMPORT
+} from './api/reportBuilder.ts'
+import type { Category } from './types'
 
 function App() {
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0]?.id ?? '')
-  const [selectedTable, setSelectedTable] = useState<string | null>(null)
-  const [printFields, setPrintFields] = useState<string[]>(printOrderFields)
-  const [sumFields, setSumFields] = useState<string[]>(summaryFields)
-  const [joinedPrintFields, setJoinedPrintFields] =
-    useState<string[]>(joinedPrintOrderFields)
+  const [data, setData] = useState<ReportBuilderData | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
+  const [selectedReportId, setSelectedReportId] = useState<string>('')
+  const [selectedTable, setSelectedTable] = useState<ApiDatabaseTable | null>(null)
+  const [availableTables, setAvailableTables] = useState<ApiDatabaseTable[]>([])
+  const [printFields, setPrintFields] = useState<string[]>([])
+  const [sumFields, setSumFields] = useState<string[]>([])
+  const [joinedPrintFields, setJoinedPrintFields] = useState<string[]>([])
   const [showJoinSections, setShowJoinSections] = useState<boolean>(true)
+  const [filterConditions, setFilterConditions] = useState<
+    Array<{ field: string; operator: string; value: string }>
+  >([])
+  const [aggregateFilters, setAggregateFilters] = useState<
+    Array<{ field: string; operator: string; value: string }>
+  >([])
+  const [sortFields, setSortFields] = useState<string[]>([])
+  const [sortOrders, setSortOrders] = useState<string[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [tableFields, setTableFields] = useState<string[]>([])
+  const [tableFieldMap, setTableFieldMap] = useState<{ [tableName: string]: string[] }>({}) // cache
+  const [isTableFieldsLoading, setIsTableFieldsLoading] = useState(false)
+
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+    [],
+  )
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return '—'
+    try {
+      return dateFormatter.format(new Date(value))
+    } catch {
+      return value
+    }
+  }
+
+  const formatDataSourceLabel = (
+    source?:
+      | ReportBuilderData['dataSources'][number]
+      | { label?: string; description?: string }
+      | string,
+  ) => {
+    if (!source) {
+      return ''
+    }
+    if (typeof source === 'string') {
+      return source
+    }
+    const label = 'label' in source ? source.label ?? '' : ''
+    if (!label) {
+      return ''
+    }
+    const description = 'description' in source ? source.description : undefined
+    return description ? `${label} — ${description}` : label
+  }
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadData() {
+      try {
+        setLoading(true)
+        setError(null)
+        const categoriesPromise = fetchCategories(controller.signal).catch((categoryError) => {
+          if (categoryError instanceof Error && categoryError.name === 'AbortError') {
+            throw categoryError
+          }
+          console.warn('Failed to load categories from API.', categoryError)
+          return null
+        })
+
+        const tablesPromise = fetchDatabaseTables(controller.signal).catch((tableError) => {
+          if (tableError instanceof Error && tableError.name === 'AbortError') {
+            throw tableError
+          }
+          console.warn('Failed to load database tables from API.', tableError)
+          return null
+        })
+
+        const [categoriesResponse, apiData, databaseTables] = await Promise.all([
+          categoriesPromise,
+          fetchReportBuilderData(controller.signal),
+          tablesPromise,
+        ])
+
+        const dataSourcesList = Array.isArray(apiData.dataSources) ? apiData.dataSources : []
+        const normalizedData: ReportBuilderData = {
+          ...apiData,
+          dataSources: dataSourcesList,
+          categories: Array.isArray(apiData.categories) ? apiData.categories : [],
+        }
+        setData(normalizedData)
+
+        const normalizeCategory = (item: {
+          id: string
+          name: string
+          description?: string
+          reportCount?: number
+          productCount?: number
+          displayOrder?: number
+        }): Category => ({
+          id: item.id,
+          name: item.name,
+          description: item.description ?? '',
+          reportCount: item.reportCount ?? 0,
+          productCount: item.productCount ?? 0,
+          displayOrder: item.displayOrder ?? 0,
+        })
+
+        const primaryCategories =
+          Array.isArray(categoriesResponse) && categoriesResponse.length > 0
+            ? categoriesResponse.map(normalizeCategory)
+            : []
+
+        setCategories(primaryCategories)
+
+        const initialCategoryId = primaryCategories[0]?.id ?? ''
+        setSelectedCategoryId(initialCategoryId)
+        const initialReports = initialCategoryId
+          ? normalizedData.reportCatalog[initialCategoryId] ?? []
+          : []
+        setSelectedReportId(initialReports[0]?.id ?? '')
+        
+        // Use database tables if available
+        const tables: ApiDatabaseTable[] =
+          Array.isArray(databaseTables) && databaseTables.length > 0
+            ? databaseTables
+            : (dataSourcesList ?? []).map((source) => ({
+                name: source.name,
+                label: formatDataSourceLabel(source) || source.name,
+              }))
+
+        setAvailableTables(tables)
+
+        // Don't auto-select table - let user choose
+        setSelectedTable(null)
+        setPrintFields([])
+        setSumFields([])
+        setJoinedPrintFields(normalizedData.defaultConfiguration.joinedPrintOrderFields ?? [])
+        setFilterConditions(normalizedData.defaultConfiguration.filterConditions ?? [])
+        setAggregateFilters(normalizedData.defaultConfiguration.aggregateFilters ?? [])
+        setSortFields(normalizedData.defaultConfiguration.sortFields ?? [])
+        setSortOrders(normalizedData.defaultConfiguration.sortOrders ?? [])
+      } catch (fetchError) {
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          return
+        }
+        console.error(fetchError)
+        setError(fetchError instanceof Error ? fetchError.message : 'Failed to load data.')
+      } finally {
+        // Ensure loader is visible for at least 800ms for better UX
+        const minLoadTime = 800
+        const elapsed = Date.now() - loadStartTime
+        const remainingTime = Math.max(0, minLoadTime - elapsed)
+        
+        setTimeout(() => {
+          setLoading(false)
+        }, remainingTime)
+      }
+    }
+
+    const loadStartTime = Date.now()
+    loadData()
+
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    if (!data) return
+    const reportsForCategory = data.reportCatalog[selectedCategoryId] ?? []
+    setSelectedReportId((current) =>
+      reportsForCategory.some((report) => report.id === current)
+        ? current
+        : reportsForCategory[0]?.id ?? '',
+    )
+  }, [data, selectedCategoryId])
+
+  // Clear field selections when table changes
+  useEffect(() => {
+    if (selectedTable) {
+      setPrintFields([])
+      setSumFields([])
+    }
+  }, [selectedTable])
+
+  // When table changes, fetch its fields
+  useEffect(() => {
+    let ignore = false;
+    if (!selectedTable) {
+      setTableFields([])
+      return
+    }
+    const cache = tableFieldMap[selectedTable.name]
+    setIsTableFieldsLoading(true)
+    if (cache) {
+      setTableFields(cache)
+      setIsTableFieldsLoading(false)
+      return
+    }
+    const controller = new AbortController()
+    fetchTableFields(selectedTable.name, controller.signal).then(fields => {
+      if (!ignore) {
+        const names = fields.map(f => f.name)
+        setTableFields(names)
+        setTableFieldMap((prev) => ({ ...prev, [selectedTable.name]: names }))
+        setIsTableFieldsLoading(false)
+      }
+    }).catch(() => {
+      if (!ignore) { setTableFields([]); setIsTableFieldsLoading(false) }
+    })
+    return () => { ignore = true; controller.abort(); setIsTableFieldsLoading(false) }
+  }, [selectedTable])
+
+  const reportCatalog = useMemo(() => data?.reportCatalog ?? {}, [data])
+  
+  // Table-specific available fields (not global!)
+  const availableFields = useMemo(() => {
+    if (!selectedTable) return []
+    return tableFields
+  }, [selectedTable, tableFields])
+  
+  const joinedAvailableFields = useMemo(
+    () => data?.defaultConfiguration.joinedAvailableFields ?? [],
+    [data],
+  )
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId),
-    [selectedCategoryId],
+    [categories, selectedCategoryId],
   )
 
-  const reports = reportCatalog[selectedCategoryId] ?? []
+  const reports = useMemo(
+    () => reportCatalog[selectedCategoryId] ?? [],
+    [reportCatalog, selectedCategoryId],
+  )
+  const selectedReport = useMemo(
+    () => reports.find((report) => report.id === selectedReportId),
+    [reports, selectedReportId],
+  )
   const selectedTables = selectedTable ? [selectedTable] : []
+  
+  // Helper values for ListPanel (which expects string arrays)
+  const availableTableLabels = availableTables.map((table) => table.label)
+  const selectedTableLabels = selectedTables.map((table) => table.label)
+  
   const availableFieldOptions = useMemo(
     () => availableFields.filter((field) => !printFields.includes(field)),
-    [printFields],
+    [availableFields, printFields],
   )
   const availableSummaryFieldOptions = useMemo(
     () => availableFields.filter((field) => !sumFields.includes(field)),
-    [sumFields],
+    [availableFields, sumFields],
   )
   const availableJoinedFieldOptions = useMemo(
     () => joinedAvailableFields.filter((field) => !joinedPrintFields.includes(field)),
-    [joinedPrintFields],
+    [joinedAvailableFields, joinedPrintFields],
   )
 
-  const handleSelectTable = (tableName: string) => {
-    setSelectedTable((current) => (current === tableName ? null : tableName))
+  const handleSelectTable = (tableLabel: string) => {
+    const table = availableTables.find((t) => t.label === tableLabel)
+    if (!table) return
+    
+    setSelectedTable((current) => 
+      current?.name === table.name ? null : table
+    )
   }
 
   const handleClearSelectedTable = () => {
@@ -140,8 +379,26 @@ function App() {
     setShowJoinSections((current) => !current)
   }
 
+
+
+  if (error) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-200">
+        <div className="max-w-md rounded-xl border border-rose-700/40 bg-rose-900/20 px-6 py-5 text-center shadow-lg shadow-rose-950/40">
+          <p className="text-base font-semibold text-rose-200">Unable to load data</p>
+          <p className="mt-2 text-sm text-rose-300">{error}</p>
+          <p className="mt-4 text-xs text-rose-200/70">
+            Please check the API server connection and reload the page.
+          </p>
+        </div>
+      </main>
+    )
+  }
+
   return (
-    <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_#1f284a55,_transparent_65%)] py-12 text-slate-200">
+    <>
+      <GlobalLoader isLoading={loading} />
+      <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_#1f284a55,_transparent_65%)] py-12 text-slate-200">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
         <Header />
 
@@ -167,6 +424,15 @@ function App() {
                     Report Number
                   </th>
                   <th scope="col" className="px-4 py-3 text-left font-medium">
+                    Status
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium">
+                    Version
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium">
+                    Last Updated
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium">
                     Action
                   </th>
                 </tr>
@@ -174,15 +440,38 @@ function App() {
               <tbody className="divide-y divide-slate-800">
                 {reports.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
+                    <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
                       No reports available for this category yet.
                     </td>
                   </tr>
                 ) : (
                   reports.map((report) => (
                     <tr key={report.id} className="bg-slate-950/60 hover:bg-slate-900/40">
-                      <td className="px-4 py-3 font-medium text-slate-200">{report.name}</td>
+                      <td className="px-4 py-3 font-medium text-slate-200">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-slate-50">{report.name}</span>
+                          <span className="text-xs font-normal text-slate-400">
+                            {report.description ?? 'No description'}
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-slate-400">{report.number}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={[
+                            'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide',
+                            report.status === 'active'
+                              ? 'bg-emerald-500/15 text-emerald-300'
+                              : report.status === 'draft'
+                              ? 'bg-amber-500/15 text-amber-300'
+                              : 'bg-slate-500/15 text-slate-300',
+                          ].join(' ')}
+                        >
+                          {report.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">{report.version}</td>
+                      <td className="px-4 py-3 text-slate-400">{formatDate(report.updatedAt)}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
                           <ActionButton label={`Add version for ${report.name}`} tone="neutral">
@@ -216,17 +505,63 @@ function App() {
             <FieldGroup label="Category">
               <SelectField
                 name="report-category"
-                defaultValue="Sales Reports"
-                options={['Sales Reports', 'Inventory', 'Operations']}
+                value={
+                  categories.length > 0
+                    ? selectedCategory?.name ?? categories[0].name
+                    : 'No categories available'
+                }
+                options={
+                  categories.length > 0
+                    ? categories.map((category) => category.name)
+                    : ['No categories available']
+                }
+                onChange={(value) => {
+                  const match = categories.find((category) => category.name === value)
+                  if (match) {
+                    setSelectedCategoryId(match.id)
+                  }
+                }}
+                disabled={categories.length === 0}
               />
             </FieldGroup>
             <FieldGroup label="Report Name">
               <SelectField
                 name="report-name"
-                defaultValue="Q3 Sales Summary"
-                options={['Q3 Sales Summary', 'Annual Overview', 'Custom Report']}
+                value={
+                  reports.length > 0
+                    ? selectedReport?.name ?? reports[0].name
+                    : 'No reports available'
+                }
+                options={
+                  reports.length > 0
+                    ? reports.map((report) => report.name)
+                    : ['No reports available']
+                }
+                onChange={(value) => {
+                  const match = reports.find((report) => report.name === value)
+                  if (match) {
+                    setSelectedReportId(match.id)
+                  }
+                }}
+                disabled={reports.length === 0}
               />
             </FieldGroup>
+          </div>
+          <div className="mt-6 grid gap-4 rounded-xl border border-slate-800/80 bg-slate-950/40 p-4 text-xs text-slate-300 md:grid-cols-3">
+            <div className="space-y-1">
+              <p className="font-semibold uppercase tracking-wide text-slate-400">Report Number</p>
+              <p className="text-sm text-slate-200">{selectedReport?.number ?? '—'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-semibold uppercase tracking-wide text-slate-400">Status</p>
+              <p className="inline-flex rounded-full bg-slate-900/70 px-2.5 py-0.5 text-sm font-semibold uppercase tracking-wide text-slate-200">
+                {selectedReport?.status ?? '—'}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-semibold uppercase tracking-wide text-slate-400">Last Updated</p>
+              <p className="text-sm text-slate-200">{formatDate(selectedReport?.updatedAt)}</p>
+            </div>
           </div>
         </SectionCard>
 
@@ -238,14 +573,14 @@ function App() {
           <div className="grid gap-6 md:grid-cols-2">
             <ListPanel
               title="Available Tables"
-              items={availableTables}
+              items={availableTableLabels}
               onItemClick={handleSelectTable}
-              selectedItems={selectedTables}
+              selectedItems={selectedTableLabels}
               emptyMessage="No tables available."
             />
             <ListPanel
               title="Selected Tables"
-              items={selectedTables}
+              items={selectedTableLabels}
               emptyMessage="Select a table from the left to include it."
               actionRenderer={(item) => (
                 <IconButton
@@ -271,7 +606,14 @@ function App() {
               title="Available Fields"
               items={availableFieldOptions}
               onItemClick={handleAddFieldToPrint}
-              emptyMessage="All fields are already selected."
+              emptyMessage={
+                !selectedTable
+                  ? 'Please select a table first.'
+                  : availableFieldOptions.length === 0 && printFields.length > 0
+                  ? 'All fields are already selected.'
+                  : 'No fields available for this table.'
+              }
+              loading={isTableFieldsLoading}
             />
             <ListPanel
               title="Fields to Print (In Order)"
@@ -318,7 +660,13 @@ function App() {
               title="Available Fields"
               items={availableSummaryFieldOptions}
               onItemClick={handleAddSummaryField}
-              emptyMessage="All fields are currently selected to sum."
+              emptyMessage={
+                !selectedTable
+                  ? 'Please select a table first.'
+                  : availableSummaryFieldOptions.length === 0 && sumFields.length > 0
+                  ? 'All fields are currently selected to sum.'
+                  : 'No fields available for this table.'
+              }
             />
             <ListPanel
               title="Fields to Sum"
@@ -363,10 +711,18 @@ function App() {
         >
           <div className="grid gap-6 md:grid-cols-2">
             <FieldGroup label="Sort Field">
-              <SelectField name="sort-field" defaultValue={sortFields[0]} options={sortFields} />
+              <SelectField
+                name="sort-field"
+                placeholder="Select a field to sort by"
+                options={availableFields} // <-- Only per-table API fields
+              />
             </FieldGroup>
             <FieldGroup label="Sort Order">
-              <SelectField name="sort-order" defaultValue={sortOrders[0]} options={sortOrders} />
+              <SelectField
+                name="sort-order"
+                placeholder="Select sort order"
+                options={sortOrders.length > 0 ? sortOrders : ['Ascending', 'Descending']}
+              />
             </FieldGroup>
           </div>
         </SectionCard>
@@ -390,29 +746,26 @@ function App() {
             {filterConditions.map((condition, index) => (
               <div
                 key={`${condition.field}-${index.toString()}`}
-                className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:gap-4"
+                className="grid gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),minmax(0,1fr),auto] md:items-center"
               >
                 <SelectField
                   name={`filter-field-${index.toString()}`}
-                  defaultValue={condition.field}
-                  options={availableFields}
+                  placeholder="Select field"
+                  options={availableFields} // <-- Only API field list
                 />
                 <SelectField
                   name={`filter-operator-${index.toString()}`}
-                  defaultValue={condition.operator}
+                  placeholder="Select operator"
                   options={['equal to', 'not equal to', 'greater than', 'less than']}
                 />
                 <input
                   type="text"
-                  defaultValue={condition.value}
+                  placeholder="Enter value"
                   className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
                 />
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-lg border border-rose-600/60 px-3 py-2 text-sm font-semibold text-rose-300 transition hover:bg-rose-600/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50"
-                >
+                <ActionButton label={`Remove filter condition ${index + 1}`} tone="danger">
                   Remove
-                </button>
+                </ActionButton>
               </div>
             ))}
           </div>
@@ -445,15 +798,15 @@ function App() {
             <FieldGroup label="Group By (1)">
               <SelectField
                 name="group-by"
-                defaultValue="customer"
-                options={['customer', 'waste_zone', 'waste_group']}
+                placeholder="Select field to group by"
+                options={availableFields} // <-- Only API field list
               />
             </FieldGroup>
             <FieldGroup label="Fields to Summarize">
               <SelectField
                 name="summary-field"
-                defaultValue="weight_kg"
-                options={summaryFields}
+                placeholder="Select field to summarize"
+                options={availableFields} // <-- Only API field list, not previously filtered set
               />
             </FieldGroup>
             <ActionButton label="Remove grouping rule" tone="danger">
@@ -481,29 +834,26 @@ function App() {
             {aggregateFilters.map((condition, index) => (
               <div
                 key={`${condition.field}-${index.toString()}-agg`}
-                className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:gap-4"
+                className="grid gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),minmax(0,1fr),auto] md:items-center"
               >
                 <SelectField
                   name={`aggregate-field-${index.toString()}`}
-                  defaultValue={condition.field}
-                  options={summaryFields}
+                  placeholder="Select field"
+                  options={availableFields} // <-- Only fields from API
                 />
                 <SelectField
                   name={`aggregate-operator-${index.toString()}`}
-                  defaultValue={condition.operator}
+                  placeholder="Select operator"
                   options={['greater than', 'less than', 'equal to']}
                 />
                 <input
                   type="text"
-                  defaultValue={condition.value}
+                  placeholder="Enter value"
                   className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
                 />
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-lg border border-rose-600/60 px-3 py-2 text-sm font-semibold text-rose-300 transition hover:bg-rose-600/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50"
-                >
+                <ActionButton label={`Remove aggregate filter ${index + 1}`} tone="danger">
                   Remove
-                </button>
+                </ActionButton>
               </div>
             ))}
           </div>
@@ -529,8 +879,8 @@ function App() {
             <div className="space-y-2">
               <textarea
                 rows={4}
-                defaultValue="LEFT JOIN Customer_Record cr ON Waste_Management_Data.customer = cr.customer_id"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 text-sm text-slate-200 shadow-inner shadow-slate-950/40 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                placeholder="LEFT JOIN Customer_Record cr ON Waste_Management_Data.customer = cr.customer_id"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
               />
               <p className="text-xs text-slate-500">
                 Note: You may need to add fields from the joined tables to the &ldquo;Print
@@ -621,15 +971,15 @@ function App() {
                 <FieldGroup label="Group By">
                   <SelectField
                     name="joined-group-by"
-                    defaultValue="None"
+                    placeholder="Select group by field"
                     options={['None', 'customer', 'supplier', 'location']}
                   />
                 </FieldGroup>
                 <FieldGroup label="Fields to Summarize">
                   <SelectField
                     name="joined-summary-field"
-                    defaultValue="Select Field"
-                    options={['Select Field', ...summaryFields]}
+                    placeholder="Select field to summarize"
+                    options={sumFields.length > 0 ? sumFields : availableFields}
                   />
                 </FieldGroup>
                 <ActionButton label="Remove grouping rule" tone="danger">
@@ -660,6 +1010,8 @@ function App() {
           </>
         )}
 
+        {isTableFieldsLoading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/60"><GlobalLoader isLoading={true} /></div>}
+
         <div className="sticky bottom-0 z-10 border-t border-slate-800 bg-slate-950/80 py-6 backdrop-blur">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <p className="text-sm text-slate-400">
@@ -675,6 +1027,7 @@ function App() {
         </div>
       </div>
     </main>
+    </>
   )
 }
 

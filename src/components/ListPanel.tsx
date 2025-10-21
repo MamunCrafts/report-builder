@@ -1,5 +1,6 @@
 import type { KeyboardEvent, ReactNode } from 'react'
 import IconButton from './IconButton.tsx'
+import GlobalLoader from './GlobalLoader.tsx'
 
 type ListPanelProps = {
   title: string
@@ -10,6 +11,7 @@ type ListPanelProps = {
   selectedItems?: string[]
   emptyMessage?: string
   actionRenderer?: (item: string, index: number) => ReactNode
+  loading?: boolean
 }
 
 export default function ListPanel({
@@ -21,6 +23,7 @@ export default function ListPanel({
   selectedItems,
   emptyMessage = 'Nothing to display yet.',
   actionRenderer,
+  loading = false,
 }: ListPanelProps) {
   const handleItemKeyDown = (event: KeyboardEvent<HTMLLIElement>, item: string) => {
     if (!onItemClick) return
@@ -35,7 +38,11 @@ export default function ListPanel({
     <div className="flex min-h-[14rem] flex-col rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-inner shadow-slate-950/40">
       <h3 className="text-sm font-semibold text-slate-200">{title}</h3>
       <ul className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1 [&_*]:transition-colors">
-        {items.length === 0 ? (
+        {loading ? (
+          <li className="flex h-32 items-center justify-center">
+            <GlobalLoader isLoading={true} />
+          </li>
+        ) : items.length === 0 ? (
           <li className="rounded-lg border border-dashed border-slate-800 bg-slate-950/40 px-3 py-4 text-center text-xs text-slate-500">
             {emptyMessage}
           </li>

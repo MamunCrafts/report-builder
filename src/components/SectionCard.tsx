@@ -18,12 +18,12 @@ export default function SectionCard({ title, description, children, footer, step
             {typeof step === 'number' && <StepBadge step={step} />}
             <h2 className="text-xl font-semibold text-white sm:text-2xl">{title}</h2>
           </div>
-          {description && <p className="text-sm text-slate-400">{description}</p>}
+          {/* {description && <p className="text-sm text-slate-400">{description}</p>} */}
         </div>
         <div className="hidden h-px flex-1 bg-gradient-to-r from-slate-800/80 via-slate-700/50 to-transparent sm:block" />
       </div>
       <div className="space-y-6">{children}</div>
-      {footer && <div className="mt-6 border-t border-slate-800/60 pt-6">{footer}</div>}
+      {/* {footer && <div className="mt-6 border-t border-slate-800/60 pt-6">{footer}</div>} */}
     </section>
   )
 }

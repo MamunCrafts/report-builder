@@ -47,10 +47,11 @@ export default function CategorySelection({
               ].join(' ')}
             >
               <span className="pointer-events-none absolute -top-3 left-5 inline-flex size-7 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-[11px] font-semibold text-slate-300 shadow shadow-slate-950/40">
-                {index + 1}
+                {category.reportCount}
               </span>
               <span className="text-lg font-semibold text-white">{category.name}</span>
-              <span className="mt-1 text-xs text-slate-400">{category.description}</span>
+            
+             
               {isSelected && (
                 <span className="pointer-events-none absolute right-4 top-4 inline-flex items-center rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-50">
                   Active

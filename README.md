@@ -73,3 +73,14 @@ export default defineConfig([
   },
 ])
 ```
+```
+mysql -h 178.18.244.179 -P 3306 -u admin -p mamun
+```
+
+```
+
+### after connect database 
+```
+SOURCE /home/mamun/official/fiverr/report-builder/sql/seed.sql;
+
+```
