@@ -602,22 +602,6 @@ function App() {
               />
             </FieldGroup>
           </div>
-          <div className="mt-6 grid gap-4 rounded-xl border border-slate-800/80 bg-slate-950/40 p-4 text-xs text-slate-300 md:grid-cols-3">
-            <div className="space-y-1">
-              <p className="font-semibold uppercase tracking-wide text-slate-400">Report Number</p>
-              <p className="text-sm text-slate-200">{selectedReport?.number ?? '—'}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="font-semibold uppercase tracking-wide text-slate-400">Status</p>
-              <p className="inline-flex rounded-full bg-slate-900/70 px-2.5 py-0.5 text-sm font-semibold uppercase tracking-wide text-slate-200">
-                {selectedReport?.status ?? '—'}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="font-semibold uppercase tracking-wide text-slate-400">Last Updated</p>
-              <p className="text-sm text-slate-200">{formatDate(selectedReport?.updatedAt)}</p>
-            </div>
-          </div>
         </SectionCard>
 
         <SectionCard
