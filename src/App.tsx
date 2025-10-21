@@ -13,8 +13,6 @@ import {
   fetchCategories,
   fetchDatabaseTables,
   fetchTableFields,
-  createCategory,
-  createReport,
   type ReportBuilderData,
   type ApiDatabaseTable,
 } from './api/reportBuilder.ts'
@@ -24,7 +22,6 @@ function App() {
   const [data, setData] = useState<ReportBuilderData | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
-  const [selectedReportId, setSelectedReportId] = useState<string>('')
   const [selectedTable, setSelectedTable] = useState<ApiDatabaseTable | null>(null)
   const [availableTables, setAvailableTables] = useState<ApiDatabaseTable[]>([])
   const [printFields, setPrintFields] = useState<string[]>([])
@@ -153,10 +150,6 @@ function App() {
 
         const initialCategoryId = primaryCategories[0]?.id ?? ''
         setSelectedCategoryId(initialCategoryId)
-        const initialReports = initialCategoryId
-          ? normalizedData.reportCatalog[initialCategoryId] ?? []
-          : []
-        setSelectedReportId(initialReports[0]?.id ?? '')
         
         // Use database tables if available
         const tables: ApiDatabaseTable[] =
@@ -201,16 +194,6 @@ function App() {
 
     return () => controller.abort()
   }, [])
-
-  useEffect(() => {
-    if (!data) return
-    const reportsForCategory = data.reportCatalog[selectedCategoryId] ?? []
-    setSelectedReportId((current) =>
-      reportsForCategory.some((report) => report.id === current)
-        ? current
-        : reportsForCategory[0]?.id ?? '',
-    )
-  }, [data, selectedCategoryId])
 
   // Clear field selections when table changes
   useEffect(() => {
@@ -273,10 +256,6 @@ function App() {
   const reports = useMemo(
     () => reportCatalog[selectedCategoryId] ?? [],
     [reportCatalog, selectedCategoryId],
-  )
-  const selectedReport = useMemo(
-    () => reports.find((report) => report.id === selectedReportId),
-    [reports, selectedReportId],
   )
   const selectedTables = selectedTable ? [selectedTable] : []
   
@@ -391,35 +370,13 @@ function App() {
     setShowJoinSections((current) => !current)
   }
 
-  const handleCreateNewReport = async () => {
-    if (!newCategoryName.trim() || !newReportName.trim()) {
-      setError('Please enter both category name and report name.')
-      return
-    }
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Create new category
-      const newCategory = await createCategory(newCategoryName.trim())
-
-      // Create new report in the category
-      await createReport(newCategory.id, newReportName.trim())
-
-      // Reload categories and data
-      const updatedCategories = await fetchCategories()
-      setCategories(updatedCategories)
-      setSelectedCategoryId(newCategory.id)
-
-      // Reset form
+  const handleCategorySelect = (categoryId: string) => {
+    setSelectedCategoryId(categoryId)
+    // Close the new report form when a category is selected
+    if (isCreatingNewReport) {
       setIsCreatingNewReport(false)
       setNewCategoryName('')
       setNewReportName('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create report.')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -496,13 +453,16 @@ function App() {
         <CategorySelection
           categories={categories}
           selectedCategoryId={selectedCategoryId}
-          onCategorySelect={setSelectedCategoryId}
+          onCategorySelect={handleCategorySelect}
         />
 
         <div className="flex justify-center">
           <button
             type="button"
-            onClick={() => setIsCreatingNewReport(true)}
+            onClick={() => {
+              setIsCreatingNewReport(true)
+              setSelectedCategoryId('')
+            }}
             className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/30 transition hover:bg-green-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
             + New Report
@@ -534,26 +494,6 @@ function App() {
                   className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
                 />
               </FieldGroup>
-              <div className="flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreatingNewReport(false)
-                    setNewCategoryName('')
-                    setNewReportName('')
-                  }}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCreateNewReport}
-                  className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-                >
-                  Create
-                </button>
-              </div>
             </div>
           </SectionCard>
         )}
@@ -650,59 +590,6 @@ function App() {
 
         <SectionCard
           step={3}
-          title="Report Details"
-          description="Define the report scope and naming conventions."
-        >
-          <div className="grid gap-6 md:grid-cols-2">
-            <FieldGroup label="Category">
-              <SelectField
-                name="report-category"
-                value={
-                  categories.length > 0
-                    ? selectedCategory?.name ?? categories[0].name
-                    : 'No categories available'
-                }
-                options={
-                  categories.length > 0
-                    ? categories.map((category) => category.name)
-                    : ['No categories available']
-                }
-                onChange={(value) => {
-                  const match = categories.find((category) => category.name === value)
-                  if (match) {
-                    setSelectedCategoryId(match.id)
-                  }
-                }}
-                disabled={categories.length === 0}
-              />
-            </FieldGroup>
-            <FieldGroup label="Report Name">
-              <SelectField
-                name="report-name"
-                value={
-                  reports.length > 0
-                    ? selectedReport?.name ?? reports[0].name
-                    : 'No reports available'
-                }
-                options={
-                  reports.length > 0
-                    ? reports.map((report) => report.name)
-                    : ['No reports available']
-                }
-                onChange={(value) => {
-                  const match = reports.find((report) => report.name === value)
-                  if (match) {
-                    setSelectedReportId(match.id)
-                  }
-                }}
-                disabled={reports.length === 0}
-              />
-            </FieldGroup>
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          step={4}
           title="Data Source"
           description="Select the tables and fields that will feed this report."
         >
@@ -733,7 +620,7 @@ function App() {
         </SectionCard>
 
         <SectionCard
-          step={5}
+          step={4}
           title="Select Fields & Print Order"
           description="Arrange the fields that will appear in your report."
         >
@@ -787,7 +674,7 @@ function App() {
         </SectionCard>
 
         <SectionCard
-          step={6}
+          step={5}
           title="Select Fields to Sum"
           description="Choose numeric fields that should be aggregated."
         >
@@ -841,7 +728,7 @@ function App() {
         </SectionCard>
 
         <SectionCard
-          step={7}
+          step={6}
           title="Select Sort"
           description="Define the default ordering of your report output."
         >
@@ -864,7 +751,7 @@ function App() {
         </SectionCard>
 
         <SectionCard
-          step={8}
+          step={7}
           title="Select Filters"
           description="Add conditions to limit the dataset before summarization."
           footer={
@@ -908,7 +795,7 @@ function App() {
         </SectionCard>
 
         <SectionCard
-          step={9}
+          step={8}
           title="Grouping & Summarization"
           description="Group records and apply aggregate functions."
           footer={
@@ -952,7 +839,7 @@ function App() {
         </SectionCard>
 
         <SectionCard
-          step={10}
+          step={9}
           title="Aggregate Filters (HAVING)"
           description="Filter aggregated data after grouping has been applied."
           footer={
@@ -996,7 +883,7 @@ function App() {
         </SectionCard>
 
         <SectionCard
-          step={11}
+          step={10}
           title="Manual Join Query (Optional)"
           description="Provide a custom JOIN clause to combine additional tables."
           footer={
@@ -1036,7 +923,7 @@ function App() {
         {showJoinSections && (
           <>
             <SectionCard
-              step={12}
+              step={11}
               title="Select Fields & Print Order (Joined Data)"
               description="Choose which joined table fields appear and in what order."
             >
@@ -1088,7 +975,7 @@ function App() {
             </SectionCard>
 
             <SectionCard
-              step={13}
+              step={12}
               title="Grouping & Summarization (Joined Data)"
               description="Apply grouping rules to data coming from joined tables."
               footer={
@@ -1131,7 +1018,7 @@ function App() {
             </SectionCard>
 
             <SectionCard
-              step={14}
+              step={13}
               title="Aggregate Filters (HAVING - Joined Data)"
               description="Apply aggregate filters to joined datasets."
               footer={
