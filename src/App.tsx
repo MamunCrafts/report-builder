@@ -15,6 +15,8 @@ import {
   fetchDatabaseTables,
   fetchTableFields,
   saveReportConfiguration,
+  getReportConfiguration,
+  updateReportConfiguration,
   type ReportBuilderData,
   type ApiDatabaseTable,
   type ReportBuilderConfiguration,
@@ -51,6 +53,9 @@ function App() {
   const [isCreatingNewReport, setIsCreatingNewReport] = useState<boolean>(false)
   const [newCategoryName, setNewCategoryName] = useState<string>('')
   const [newReportName, setNewReportName] = useState<string>('')
+  const [isEditingReport, setIsEditingReport] = useState<boolean>(false)
+  const [editingReportId, setEditingReportId] = useState<string | null>(null)
+  const [editingReportName, setEditingReportName] = useState<string>('')
 
   const dateFormatter = useMemo(
     () =>
@@ -386,8 +391,16 @@ function App() {
   }
 
   const handleSaveReport = async () => {
-    if (!newCategoryName.trim() || !newReportName.trim()) {
+    // For edit mode, only report name is required. For create mode, both are required
+    if (!isEditingReport && (!newCategoryName.trim() || !newReportName.trim())) {
       const errorMsg = 'Please enter both category name and report name.'
+      setError(errorMsg)
+      toast.error(errorMsg)
+      return
+    }
+
+    if (!newReportName.trim()) {
+      const errorMsg = 'Please enter a report name.'
       setError(errorMsg)
       toast.error(errorMsg)
       return
@@ -417,21 +430,29 @@ function App() {
         joinedAggregateFilters: joinedAggregateFilters,
       }
 
-      // Save report configuration
-      await saveReportConfiguration(
-        newCategoryName.trim(),
-        newReportName.trim(),
-        configuration,
-      )
+      if (isEditingReport && editingReportId) {
+        // Update existing report
+        await updateReportConfiguration(
+          editingReportId,
+          configuration,
+        )
+        toast.success(`Report "${newReportName}" updated successfully!`)
+        handleCancelEdit()
+      } else {
+        // Create new report
+        await saveReportConfiguration(
+          newCategoryName.trim(),
+          newReportName.trim(),
+          configuration,
+        )
+        toast.success(`Report "${newReportName}" created successfully!`)
+        setNewCategoryName('')
+        setNewReportName('')
+        setIsCreatingNewReport(false)
+      }
 
       // Show success message
       setError(null)
-      toast.success(`Report "${newReportName}" created successfully!`)
-
-      // Reset form
-      setNewCategoryName('')
-      setNewReportName('')
-      setIsCreatingNewReport(false)
 
       // Reload categories
       const updatedCategories = await fetchCategories()
@@ -443,6 +464,63 @@ function App() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleEditReport = async (reportId: string, reportName: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Fetch the report configuration
+      const { configuration } = await getReportConfiguration(reportId)
+
+      // Set edit mode and populate form with existing data
+      setIsEditingReport(true)
+      setEditingReportId(reportId)
+      setEditingReportName(reportName)
+      setNewReportName(reportName)
+
+      // Find and select the table
+      if (configuration.dataSource) {
+        const table = availableTables.find((t) => t.name === configuration.dataSource)
+        if (table) {
+          setSelectedTable(table)
+        }
+      }
+
+      // Populate fields
+      setPrintFields(configuration.printOrderFields || [])
+      setSumFields(configuration.summaryFields || [])
+      setFilterConditions(configuration.filterConditions || [{ field: '', operator: '', value: '' }])
+      setAggregateFilters(configuration.aggregateFilters || [{ field: '', operator: '', value: '' }])
+      setJoinQuery(configuration.joinQuery || '')
+      setJoinedPrintFields(configuration.joinedPrintOrderFields || [])
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+
+      toast.success('Report loaded for editing')
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load report for editing.'
+      setError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditingReport(false)
+    setEditingReportId(null)
+    setEditingReportName('')
+    setNewReportName('')
+    setPrintFields([])
+    setSumFields([])
+    setFilterConditions([{ field: '', operator: '', value: '' }])
+    setAggregateFilters([{ field: '', operator: '', value: '' }])
+    setJoinQuery('')
+    setJoinedPrintFields([])
+    setSelectedTable(null)
   }
 
   // Parse table names from JOIN query and fetch their fields
@@ -529,39 +607,63 @@ function App() {
               setIsCreatingNewReport(true)
               setSelectedCategoryId('')
             }}
-            className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/30 transition hover:bg-green-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 transition-all duration-300 hover:bg-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
-            + New Report
+            <span aria-hidden>+</span>
+            New Report
           </button>
         </div>
 
-        {isCreatingNewReport && (
-          <SectionCard
-            step={1}
-            title="Create New Report"
-            description="Enter details for your new report category and name."
-          >
-            <div className="space-y-6">
-              <FieldGroup label="New Category Name">
-                <input
-                  type="text"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="Enter category name"
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-                />
-              </FieldGroup>
-              <FieldGroup label="Report Name">
-                <input
-                  type="text"
-                  value={newReportName}
-                  onChange={(e) => setNewReportName(e.target.value)}
-                  placeholder="Enter report name"
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-                />
-              </FieldGroup>
-            </div>
-          </SectionCard>
+        {(isCreatingNewReport || isEditingReport) && (
+          <div className={`overflow-hidden transition-all duration-500 ease-in-out ${isCreatingNewReport || isEditingReport ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
+            <SectionCard
+              step={2}
+              title={isEditingReport ? `Edit Report: ${editingReportName}` : "Create New Report"}
+              description={isEditingReport ? "Update the report configuration." : "Enter details for your new report category and name."}
+              footer={
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isEditingReport) {
+                        handleCancelEdit()
+                      } else {
+                        setIsCreatingNewReport(false)
+                        setNewCategoryName('')
+                        setNewReportName('')
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                  >
+                    {isEditingReport ? 'Cancel' : 'Hide Form'}
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-6">
+                {!isEditingReport && (
+                  <FieldGroup label="New Category Name">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Enter category name"
+                      className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                    />
+                  </FieldGroup>
+                )}
+                <FieldGroup label={isEditingReport ? "Report Name" : "Report Name"}>
+                  <input
+                    type="text"
+                    value={newReportName}
+                    onChange={(e) => setNewReportName(e.target.value)}
+                    placeholder="Enter report name"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                  />
+                </FieldGroup>
+              </div>
+            </SectionCard>
+          </div>
         )}
 
         {!isCreatingNewReport && (
@@ -634,9 +736,13 @@ function App() {
                           <ActionButton label={`Add version for ${report.name}`} tone="neutral">
                             Add
                           </ActionButton>
-                          <ActionButton label={`Edit ${report.name}`} tone="primary">
+                          <button
+                            type="button"
+                            onClick={() => handleEditReport(report.id, report.name)}
+                            className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:ring-sky-300"
+                          >
                             Edit
-                          </ActionButton>
+                          </button>
                           <ActionButton label={`Delete ${report.name}`} tone="danger">
                             Delete
                           </ActionButton>
