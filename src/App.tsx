@@ -18,12 +18,18 @@ import {
   aggregateFilters,
   sortFields,
   sortOrders,
+  joinedAvailableFields,
+  joinedPrintOrderFields,
 } from './data/mockData'
 
 function App() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(categories[0]?.id ?? '')
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [printFields, setPrintFields] = useState<string[]>(printOrderFields)
+  const [sumFields, setSumFields] = useState<string[]>(summaryFields)
+  const [joinedPrintFields, setJoinedPrintFields] =
+    useState<string[]>(joinedPrintOrderFields)
+  const [showJoinSections, setShowJoinSections] = useState<boolean>(true)
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId),
@@ -35,6 +41,14 @@ function App() {
   const availableFieldOptions = useMemo(
     () => availableFields.filter((field) => !printFields.includes(field)),
     [printFields],
+  )
+  const availableSummaryFieldOptions = useMemo(
+    () => availableFields.filter((field) => !sumFields.includes(field)),
+    [sumFields],
+  )
+  const availableJoinedFieldOptions = useMemo(
+    () => joinedAvailableFields.filter((field) => !joinedPrintFields.includes(field)),
+    [joinedPrintFields],
   )
 
   const handleSelectTable = (tableName: string) => {
@@ -68,6 +82,62 @@ function App() {
       updated.splice(targetIndex, 0, removed)
       return updated
     })
+  }
+
+  const handleAddSummaryField = (fieldName: string) => {
+    setSumFields((current) => (current.includes(fieldName) ? current : [...current, fieldName]))
+  }
+
+  const handleRemoveSummaryField = (fieldName: string) => {
+    setSumFields((current) => current.filter((field) => field !== fieldName))
+  }
+
+  const handleMoveSummaryField = (fieldName: string, direction: 'up' | 'down') => {
+    setSumFields((current) => {
+      const index = current.indexOf(fieldName)
+      if (index === -1) return current
+
+      const targetIndex = direction === 'up' ? index - 1 : index + 1
+      if (targetIndex < 0 || targetIndex >= current.length) {
+        return current
+      }
+
+      const updated = [...current]
+      const [removed] = updated.splice(index, 1)
+      updated.splice(targetIndex, 0, removed)
+      return updated
+    })
+  }
+
+  const handleAddJoinedField = (fieldName: string) => {
+    setJoinedPrintFields((current) =>
+      current.includes(fieldName) ? current : [...current, fieldName],
+    )
+  }
+
+  const handleRemoveJoinedField = (fieldName: string) => {
+    setJoinedPrintFields((current) => current.filter((field) => field !== fieldName))
+  }
+
+  const handleMoveJoinedField = (fieldName: string, direction: 'up' | 'down') => {
+    setJoinedPrintFields((current) => {
+      const index = current.indexOf(fieldName)
+      if (index === -1) return current
+
+      const targetIndex = direction === 'up' ? index - 1 : index + 1
+      if (targetIndex < 0 || targetIndex >= current.length) {
+        return current
+      }
+
+      const updated = [...current]
+      const [removed] = updated.splice(index, 1)
+      updated.splice(targetIndex, 0, removed)
+      return updated
+    })
+  }
+
+  const toggleJoinSections = () => {
+    setShowJoinSections((current) => !current)
   }
 
   return (
@@ -244,8 +314,45 @@ function App() {
           description="Choose numeric fields that should be aggregated."
         >
           <div className="grid gap-6 md:grid-cols-2">
-            <ListPanel title="Available Fields" items={availableFields} />
-            <ListPanel title="Fields to Sum" items={summaryFields} withActions />
+            <ListPanel
+              title="Available Fields"
+              items={availableSummaryFieldOptions}
+              onItemClick={handleAddSummaryField}
+              emptyMessage="All fields are currently selected to sum."
+            />
+            <ListPanel
+              title="Fields to Sum"
+              items={sumFields}
+              numbered
+              emptyMessage="Select a field from the left to add it."
+              actionRenderer={(item, index) => (
+                <>
+                  <IconButton
+                    label={`Move ${item} up`}
+                    variant="ghost"
+                    onClick={() => handleMoveSummaryField(item, 'up')}
+                    disabled={index === 0}
+                  >
+                    Up
+                  </IconButton>
+                  <IconButton
+                    label={`Move ${item} down`}
+                    variant="ghost"
+                    onClick={() => handleMoveSummaryField(item, 'down')}
+                    disabled={index === sumFields.length - 1}
+                  >
+                    Dn
+                  </IconButton>
+                  <IconButton
+                    label={`Remove ${item}`}
+                    variant="danger"
+                    onClick={() => handleRemoveSummaryField(item)}
+                  >
+                    X
+                  </IconButton>
+                </>
+              )}
+            />
           </div>
         </SectionCard>
 
@@ -410,103 +517,148 @@ function App() {
             <div className="flex justify-end">
               <button
                 type="button"
+                onClick={toggleJoinSections}
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
               >
-                Hide Join Query
+                {showJoinSections ? 'Hide Join Query' : 'Show Join Query'}
               </button>
             </div>
           }
         >
-          <div className="space-y-2">
-            <textarea
-              rows={4}
-              defaultValue="LEFT JOIN Customer_Record cr ON Waste_Management_Data.customer = cr.customer_id"
-              className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 text-sm text-slate-200 shadow-inner shadow-slate-950/40 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-            />
-            <p className="text-xs text-slate-500">
-              Note: You may need to add fields from the joined tables to the &ldquo;Print Order&rdquo; section manually.
-            </p>
-          </div>
+          {showJoinSections ? (
+            <div className="space-y-2">
+              <textarea
+                rows={4}
+                defaultValue="LEFT JOIN Customer_Record cr ON Waste_Management_Data.customer = cr.customer_id"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 text-sm text-slate-200 shadow-inner shadow-slate-950/40 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+              />
+              <p className="text-xs text-slate-500">
+                Note: You may need to add fields from the joined tables to the &ldquo;Print
+                Order&rdquo; section manually.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-6 text-sm text-slate-400">
+              Join configuration is currently hidden. Select &ldquo;Show Join Query&rdquo; to
+              manage joined data settings.
+            </div>
+          )}
         </SectionCard>
 
-        <SectionCard
-          step={12}
-          title="Select Fields & Print Order (Joined Data)"
-          description="Choose which joined table fields appear and in what order."
-        >
-          <div className="grid gap-6 md:grid-cols-2">
-            <ListPanel title="Available Fields" items={availableFields} />
-            <ListPanel
-              title="Fields to Print (In Order)"
-              items={printOrderFields}
-              numbered
-              withActions
-            />
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          step={13}
-          title="Grouping & Summarization (Joined Data)"
-          description="Apply grouping rules to data coming from joined tables."
-          footer={
-            <div className="flex justify-between">
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-400">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border border-slate-700 bg-slate-950 text-sky-500 focus:ring-2 focus:ring-sky-500/50"
+        {showJoinSections && (
+          <>
+            <SectionCard
+              step={12}
+              title="Select Fields & Print Order (Joined Data)"
+              description="Choose which joined table fields appear and in what order."
+            >
+              <div className="grid gap-6 md:grid-cols-2">
+                <ListPanel
+                  title="Available Fields"
+                  items={availableJoinedFieldOptions}
+                  onItemClick={handleAddJoinedField}
+                  emptyMessage="All joined fields are already selected."
                 />
-                Show Groups Only
-              </label>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
-              >
-                + Add
-              </button>
-            </div>
-          }
-        >
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),auto] md:items-center">
-            <FieldGroup label="Group By">
-              <SelectField
-                name="joined-group-by"
-                defaultValue="None"
-                options={['None', 'customer', 'supplier', 'location']}
-              />
-            </FieldGroup>
-            <FieldGroup label="Fields to Summarize">
-              <SelectField
-                name="joined-summary-field"
-                defaultValue="Select Field"
-                options={['Select Field', ...summaryFields]}
-              />
-            </FieldGroup>
-            <ActionButton label="Remove grouping rule" tone="danger">
-              Remove
-            </ActionButton>
-          </div>
-        </SectionCard>
+                <ListPanel
+                  title="Fields to Print (In Order)"
+                  items={joinedPrintFields}
+                  numbered
+                  emptyMessage="Select a joined field from the left to include it."
+                  actionRenderer={(item, index) => (
+                    <>
+                      <IconButton
+                        label={`Move ${item} up`}
+                        variant="ghost"
+                        onClick={() => handleMoveJoinedField(item, 'up')}
+                        disabled={index === 0}
+                      >
+                        Up
+                      </IconButton>
+                      <IconButton
+                        label={`Move ${item} down`}
+                        variant="ghost"
+                        onClick={() => handleMoveJoinedField(item, 'down')}
+                        disabled={index === joinedPrintFields.length - 1}
+                      >
+                        Dn
+                      </IconButton>
+                      <IconButton
+                        label={`Remove ${item}`}
+                        variant="danger"
+                        onClick={() => handleRemoveJoinedField(item)}
+                      >
+                        X
+                      </IconButton>
+                    </>
+                  )}
+                />
+              </div>
+            </SectionCard>
 
-        <SectionCard
-          step={14}
-          title="Aggregate Filters (HAVING - Joined Data)"
-          description="Apply aggregate filters to joined datasets."
-          footer={
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
-              >
-                + Add Condition
-              </button>
-            </div>
-          }
-        >
-          <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-6 text-center text-sm text-slate-500">
-            No aggregate filters have been defined for the joined data yet.
-          </div>
-        </SectionCard>
+            <SectionCard
+              step={13}
+              title="Grouping & Summarization (Joined Data)"
+              description="Apply grouping rules to data coming from joined tables."
+              footer={
+                <div className="flex justify-between">
+                  <label className="flex items-center gap-2 text-xs font-medium text-slate-400">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border border-slate-700 bg-slate-950 text-sky-500 focus:ring-2 focus:ring-sky-500/50"
+                    />
+                    Show Groups Only
+                  </label>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                  >
+                    + Add
+                  </button>
+                </div>
+              }
+            >
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),auto] md:items-center">
+                <FieldGroup label="Group By">
+                  <SelectField
+                    name="joined-group-by"
+                    defaultValue="None"
+                    options={['None', 'customer', 'supplier', 'location']}
+                  />
+                </FieldGroup>
+                <FieldGroup label="Fields to Summarize">
+                  <SelectField
+                    name="joined-summary-field"
+                    defaultValue="Select Field"
+                    options={['Select Field', ...summaryFields]}
+                  />
+                </FieldGroup>
+                <ActionButton label="Remove grouping rule" tone="danger">
+                  Remove
+                </ActionButton>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              step={14}
+              title="Aggregate Filters (HAVING - Joined Data)"
+              description="Apply aggregate filters to joined datasets."
+              footer={
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                  >
+                    + Add Condition
+                  </button>
+                </div>
+              }
+            >
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-6 text-center text-sm text-slate-500">
+                No aggregate filters have been defined for the joined data yet.
+              </div>
+            </SectionCard>
+          </>
+        )}
 
         <div className="sticky bottom-0 z-10 border-t border-slate-800 bg-slate-950/80 py-6 backdrop-blur">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">

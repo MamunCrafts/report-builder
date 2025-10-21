@@ -29,6 +29,16 @@ export const printOrderFields = ['customer', 'weight_kg', 'date_recorded']
 
 export const summaryFields = ['weight_kg', 'volume_l', 'cost_usd']
 
+export const joinedAvailableFields = [
+  'customer_name',
+  'customer_email',
+  'customer_phone',
+  'region',
+  'account_status',
+]
+
+export const joinedPrintOrderFields = ['customer_name', 'region', 'account_status']
+
 export const filterConditions: FilterCondition[] = [
   { field: 'waste_zone', operator: 'equal to', value: 'North' },
 ]
