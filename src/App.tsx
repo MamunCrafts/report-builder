@@ -30,7 +30,7 @@ function App() {
   const [printFields, setPrintFields] = useState<string[]>([])
   const [sumFields, setSumFields] = useState<string[]>([])
   const [joinedPrintFields, setJoinedPrintFields] = useState<string[]>([])
-  const [showJoinSections, setShowJoinSections] = useState<boolean>(true)
+  const [showJoinSections, setShowJoinSections] = useState<boolean>(false)
   const [filterConditions, setFilterConditions] = useState<
     Array<{ field: string; operator: string; value: string }>
   >([])
@@ -948,46 +948,51 @@ function App() {
           </div>
         </SectionCard>
 
-        <SectionCard
-          step={10}
-          title="Manual Join Query (Optional)"
-          description="Provide a custom JOIN clause to combine additional tables."
-          footer={
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={toggleJoinSections}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
-              >
-                {showJoinSections ? 'Hide Join Query' : 'Show Join Query'}
-              </button>
-            </div>
-          }
-        >
-          {showJoinSections ? (
-            <div className="space-y-2">
-              <textarea
-                rows={4}
-                value={joinQuery}
-                onChange={(e) => setJoinQuery(e.target.value)}
-                placeholder="LEFT JOIN Customer_Record cr ON Waste_Management_Data.customer = cr.customer_id"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-              />
-              <p className="text-xs text-slate-500">
-                Note: You may need to add fields from the joined tables to the &ldquo;Print
-                Order&rdquo; section manually.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-6 text-sm text-slate-400">
-              Join configuration is currently hidden. Select &ldquo;Show Join Query&rdquo; to
-              manage joined data settings.
-            </div>
-          )}
-        </SectionCard>
+        {/* Join Button */}
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={toggleJoinSections}
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 transition-all duration-300 hover:bg-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          >
+            <span aria-hidden className={`transition-transform duration-300 ${showJoinSections ? 'rotate-180' : ''}`}>⚡</span>
+            {showJoinSections ? 'Hide Join' : 'Join'}
+          </button>
+        </div>
 
-        {showJoinSections && (
-          <>
+        {/* Join Sections - With Animation */}
+        <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showJoinSections ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className="space-y-6">
+            <SectionCard
+              step={10}
+              title="Manual Join Query (Optional)"
+              description="Provide a custom JOIN clause to combine additional tables."
+              footer={
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={toggleJoinSections}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                  >
+                    Hide Join Query
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-2">
+                <textarea
+                  rows={4}
+                  value={joinQuery}
+                  onChange={(e) => setJoinQuery(e.target.value)}
+                  placeholder="LEFT JOIN Customer_Record cr ON Waste_Management_Data.customer = cr.customer_id"
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                />
+                <p className="text-xs text-slate-500">
+                  Note: You may need to add fields from the joined tables to the &ldquo;Print
+                  Order&rdquo; section manually.
+                </p>
+              </div>
+            </SectionCard>
             <SectionCard
               step={11}
               title="Select Fields & Print Order (Joined Data)"
@@ -1126,8 +1131,8 @@ function App() {
                 ))}
               </div>
             </SectionCard>
-          </>
-        )}
+          </div>
+        </div>
 
         {isTableFieldsLoading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/60"><GlobalLoader isLoading={true} /></div>}
 
