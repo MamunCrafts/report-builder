@@ -733,9 +733,9 @@ function App() {
                       <td className="px-4 py-3 text-slate-400">{formatDate(report.updatedAt)}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
-                          <ActionButton label={`Add version for ${report.name}`} tone="neutral">
+                          {/* <ActionButton label={`Add version for ${report.name}`} tone="neutral">
                             Add
-                          </ActionButton>
+                          </ActionButton> */}
                           <button
                             type="button"
                             onClick={() => handleEditReport(report.id, report.name)}
