@@ -56,6 +56,8 @@ function App() {
   const [isEditingReport, setIsEditingReport] = useState<boolean>(false)
   const [editingReportId, setEditingReportId] = useState<string | null>(null)
   const [editingReportName, setEditingReportName] = useState<string>('')
+  const [isViewingSQLQuery, setIsViewingSQLQuery] = useState<boolean>(false)
+  const [currentSQLQuery, setCurrentSQLQuery] = useState<string>('')
 
   const dateFormatter = useMemo(
     () =>
@@ -523,6 +525,150 @@ function App() {
     setSelectedTable(null)
   }
 
+  const handleViewReport = async (reportId: string, reportName: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Fetch the report configuration
+      const { configuration } = await getReportConfiguration(reportId)
+
+      // Generate SQL query
+      const sqlQuery = generateSQLQuery(configuration)
+      setCurrentSQLQuery(sqlQuery)
+      setIsViewingSQLQuery(true)
+
+      toast.success(`Loaded query for "${reportName}"`)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load report query.'
+      setError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generateSQLQuery = (config: ReportBuilderConfiguration): string => {
+    let query = 'SELECT '
+    
+    // Step 4 & 11: Build SELECT clause with print fields and summary fields
+    const selectFields: string[] = []
+    
+    // Add regular print order fields (Step 4)
+    if (config.printOrderFields && config.printOrderFields.length > 0) {
+      selectFields.push(...config.printOrderFields)
+    }
+    
+    // Add joined print order fields (Step 11)
+    if (config.joinedPrintOrderFields && config.joinedPrintOrderFields.length > 0) {
+      selectFields.push(...config.joinedPrintOrderFields)
+    }
+    
+    // Step 5: Add summary fields with SUM aggregation
+    if (config.summaryFields && config.summaryFields.length > 0) {
+      const sumFields = config.summaryFields.map(field => `SUM(${field}) AS total_${field}`)
+      selectFields.push(...sumFields)
+    }
+    
+    // Add fields to query
+    if (selectFields.length > 0) {
+      query += selectFields.join(', ')
+    } else {
+      query += '*'
+    }
+    
+    // Step 3: Add FROM clause (Data Source)
+    query += `\nFROM ${config.dataSource}`
+    
+    // Step 10: Add JOIN clause if exists (Manual Join Query)
+    if (config.joinQuery?.trim()) {
+      query += `\n${config.joinQuery}`
+    }
+    
+    // Step 7: Add WHERE clause for filters (Select Filters)
+    if (config.filterConditions && config.filterConditions.length > 0) {
+      const conditions = config.filterConditions
+        .filter(c => c.field && c.operator && c.value)
+        .map(c => {
+          // Map operators to SQL syntax
+          let sqlOperator = c.operator
+          if (c.operator === 'equal to') sqlOperator = '='
+          else if (c.operator === 'not equal to') sqlOperator = '!='
+          else if (c.operator === 'greater than') sqlOperator = '>'
+          else if (c.operator === 'less than') sqlOperator = '<'
+          
+          return `${c.field} ${sqlOperator} '${c.value}'`
+        })
+      
+      if (conditions.length > 0) {
+        query += `\nWHERE ${conditions.join(' AND ')}`
+      }
+    }
+    
+    // Step 8 & 12: Add GROUP BY clause (Grouping & Summarization)
+    const groupByFields: string[] = []
+    
+    // Regular group by fields (Step 8)
+    if (config.groupByFields && config.groupByFields.length > 0) {
+      groupByFields.push(...config.groupByFields)
+    }
+    
+    // Joined group by fields (Step 12)
+    if (config.joinedGroupByFields && config.joinedGroupByFields.length > 0) {
+      groupByFields.push(...config.joinedGroupByFields)
+    }
+    
+    if (groupByFields.length > 0) {
+      query += `\nGROUP BY ${groupByFields.join(', ')}`
+    }
+    
+    // Step 9 & 13: Add HAVING clause for aggregate filters
+    const havingConditions: string[] = []
+    
+    // Regular aggregate filters (Step 9)
+    if (config.aggregateFilters && config.aggregateFilters.length > 0) {
+      const conditions = config.aggregateFilters
+        .filter(c => c.field && c.operator && c.value)
+        .map(c => {
+          let sqlOperator = c.operator
+          if (c.operator === 'equal to') sqlOperator = '='
+          
+          return `${c.field} ${sqlOperator} ${c.value}`
+        })
+      havingConditions.push(...conditions)
+    }
+    
+    // Joined aggregate filters (Step 13)
+    if (config.joinedAggregateFilters && config.joinedAggregateFilters.length > 0) {
+      const conditions = config.joinedAggregateFilters
+        .filter(c => c.field && c.operator && c.value)
+        .map(c => {
+          let sqlOperator = c.operator
+          if (c.operator === 'equal to') sqlOperator = '='
+          
+          return `${c.field} ${sqlOperator} ${c.value}`
+        })
+      havingConditions.push(...conditions)
+    }
+    
+    if (havingConditions.length > 0) {
+      query += `\nHAVING ${havingConditions.join(' AND ')}`
+    }
+    
+    // Step 6: Add ORDER BY clause (Select Sort)
+    if (config.sortFields && config.sortFields.length > 0) {
+      const orderBy = config.sortFields.map((field, index) => {
+        const order = config.sortOrders[index] || 'ASC'
+        return `${field} ${order}`
+      })
+      query += `\nORDER BY ${orderBy.join(', ')}`
+    }
+    
+    query += ';'
+    
+    return query
+  }
+
   // Parse table names from JOIN query and fetch their fields
   useEffect(() => {
     const parseAndFetchJoinedTableFields = async () => {
@@ -733,9 +879,13 @@ function App() {
                       <td className="px-4 py-3 text-slate-400">{formatDate(report.updatedAt)}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
-                          {/* <ActionButton label={`Add version for ${report.name}`} tone="neutral">
-                            Add
-                          </ActionButton> */}
+                          <button
+                            type="button"
+                            onClick={() => handleViewReport(report.id, report.name)}
+                            className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:ring-emerald-300"
+                          >
+                            View
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleEditReport(report.id, report.name)}
@@ -1258,6 +1408,58 @@ function App() {
         </button>
       </div>
     </div>
+
+    {/* SQL Query Modal */}
+    {isViewingSQLQuery && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+        <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+            <h2 className="text-2xl font-bold text-slate-100">Generated SQL Query</h2>
+            <button
+              type="button"
+              onClick={() => setIsViewingSQLQuery(false)}
+              className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+              aria-label="Close modal"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-6">
+              <pre className="overflow-x-auto text-base leading-relaxed text-emerald-400 whitespace-pre-wrap">
+                <code>{currentSQLQuery}</code>
+              </pre>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-slate-800 px-6 py-4">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(currentSQLQuery)
+                toast.success('SQL query copied to clipboard!')
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy Query
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsViewingSQLQuery(false)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-800"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   )
 }
