@@ -590,7 +590,7 @@ function App() {
     <>
       <GlobalLoader isLoading={loading} />
       <Toaster position="bottom-right" reverseOrder={false} />
-      <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_#1f284a55,_transparent_65%)] py-12 text-slate-200">
+      <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_#1f284a55,_transparent_65%)] py-12 pb-40 text-slate-200">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
         <Header />
 
@@ -1067,7 +1067,7 @@ function App() {
         </div>
 
         {/* Join Sections - With Animation */}
-        <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showJoinSections ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
+        <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showJoinSections ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'}`}>
           <div className="space-y-6">
             <SectionCard
               step={10}
@@ -1241,25 +1241,23 @@ function App() {
         </div>
 
         {isTableFieldsLoading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/60"><GlobalLoader isLoading={true} /></div>}
-
-        
-
-       <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-slate-800 bg-slate-950/80 py-6 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 lg:px-8">
-            <p className="text-sm text-slate-400">
-              Review your selections before saving. You can adjust these settings later.
-            </p>
-            <button
-              type="button"
-              onClick={handleSaveReport}
-              className="inline-flex items-center gap-3 rounded-lg bg-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-            >
-              Save Report
-            </button>
-          </div>
-        </div>
-      </div> 
+      </div>
     </main>
+
+    <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-slate-800 bg-slate-950/80 py-6 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 lg:px-8">
+        <p className="text-sm text-slate-400">
+          Review your selections before saving. You can adjust these settings later.
+        </p>
+        <button
+          type="button"
+          onClick={handleSaveReport}
+          className="inline-flex items-center gap-3 rounded-lg bg-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+        >
+          Save Report
+        </button>
+      </div>
+    </div>
     </>
   )
 }
