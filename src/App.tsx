@@ -1242,8 +1242,10 @@ function App() {
 
         {isTableFieldsLoading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/60"><GlobalLoader isLoading={true} /></div>}
 
-        <div className="sticky bottom-0 z-10 border-t border-slate-800 bg-slate-950/80 py-6 backdrop-blur">
-          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+        
+
+       <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-slate-800 bg-slate-950/80 py-6 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 lg:px-8">
             <p className="text-sm text-slate-400">
               Review your selections before saving. You can adjust these settings later.
             </p>
@@ -1256,7 +1258,7 @@ function App() {
             </button>
           </div>
         </div>
-      </div>
+      </div> 
     </main>
     </>
   )
