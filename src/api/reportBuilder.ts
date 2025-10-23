@@ -215,6 +215,32 @@ export async function createCategory(
   return payload.data as ApiCategory
 }
 
+export async function updateCategory(
+  id: string,
+  name: string,
+  description?: string,
+  signal?: AbortSignal,
+): Promise<ApiCategory> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/update-category`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, name, description: description ?? '' }),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to update category (status ${response.status}).`)
+  }
+
+  const payload = await response.json()
+
+  if (!payload?.success) {
+    throw new Error(payload?.message ?? 'Unexpected update category API response.')
+  }
+
+  return payload.data as ApiCategory
+}
+
 export async function createReport(
   categoryId: string,
   name: string,

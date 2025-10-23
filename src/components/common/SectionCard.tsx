@@ -7,9 +7,10 @@ type SectionCardProps = {
   footer?: ReactNode;
   step?: number;
   isNewButton?: boolean;
+  onNewClick?: () => void;
 };
 
-export default function SectionCard({ title, children, isNewButton }: SectionCardProps) {
+export default function SectionCard({ title, children, isNewButton, onNewClick }: SectionCardProps) {
   return (
     <section className="rounded-3xl border border-slate-800/60 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40 sm:p-8">
       <div className="flex items-center justify-between gap-4 pb-6">
@@ -22,6 +23,7 @@ export default function SectionCard({ title, children, isNewButton }: SectionCar
             {isNewButton && (
               <button
                 type="button"
+                onClick={() => onNewClick && onNewClick()}
                 className="inline-flex font-bold items-center gap-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm  px-3 py-1.5 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
                 NEW +
