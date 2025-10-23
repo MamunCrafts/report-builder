@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import toast, { Toaster } from 'react-hot-toast'
-import Header from './Header.tsx'
-import CategorySelection from './CategorySelection.tsx'
+import toast from 'react-hot-toast'
 import SectionCard from './common/SectionCard.tsx'
 import FieldGroup from './FieldGroup.tsx'
 import SelectField from './SelectField.tsx'
 import ListPanel from './ListPanel.tsx'
 import ActionButton from './ActionButton.tsx'
 import IconButton from './IconButton.tsx'
-import GlobalLoader from './GlobalLoader.tsx'
 import {
   fetchReportBuilderData,
   fetchDatabaseTables,
@@ -36,6 +33,8 @@ export default function ReportBuilderForm({
   setSelectedCategoryId,
   loading,
 }: ReportBuilderFormProps) {
+  // mark prop as used (component no longer changes category from inside)
+  void setSelectedCategoryId
   const [data, setData] = useState<ReportBuilderData | null>(null)
   const [availableTables, setAvailableTables] = useState<ApiDatabaseTable[]>([])
   const [selectedTable, setSelectedTable] = useState<ApiDatabaseTable | null>(null)
@@ -290,15 +289,8 @@ export default function ReportBuilderForm({
     setShowJoinSections((current) => !current)
   }
 
-  const handleCategorySelect = (categoryId: string) => {
-    setSelectedCategoryId(categoryId)
-    // Close the new report form when a category is selected
-    if (isCreatingNewReport) {
-      setIsCreatingNewReport(false)
-      setNewCategoryName('')
-      setNewReportName('')
-    }
-  }
+
+
 
   const handleSaveReport = async () => {
     // For edit mode, only report name is required. For create mode, both are required
@@ -482,22 +474,11 @@ export default function ReportBuilderForm({
 
   return (
     <>
-      <Toaster position="bottom-right" reverseOrder={false} />
-      <GlobalLoader isLoading={loading} />
-      <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_#1f284a55,_transparent_65%)] py-12 pb-40 text-slate-200">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
-          <Header />
-          <CategorySelection
-            categories={categories}
-            selectedCategoryId={selectedCategoryId}
-            onCategorySelect={handleCategorySelect}
-          />
-
-          <SectionCard
-            step={3}
-            title="Data Source"
-            description="Select the tables and fields that will feed this report."
-          >
+      <SectionCard
+        step={3}
+        title="Data Source"
+        description="Select the tables and fields that will feed this report."
+      >
             <div className="grid gap-6 md:grid-cols-2">
               <ListPanel
                 title="Available Tables"
@@ -953,8 +934,6 @@ export default function ReportBuilderForm({
               </div>
             </div>
           )}
-        </div>
-      </main>
-    </>
+  </>
   )
 }

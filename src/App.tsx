@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
-import ReportBuilderForm from './components/ReportBuilderForm.tsx'
+import Header from './components/Header'
+import CategorySelection from './components/CategorySelection'
+import GlobalLoader from './components/GlobalLoader'
+import { Toaster } from 'react-hot-toast'
 import type { Category } from './types'
 import { fetchCategories } from './api/reportBuilder'
 
@@ -41,14 +44,27 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <ReportBuilderForm
-        categories={categories}
-        selectedCategoryId={selectedCategoryId}
-        setSelectedCategoryId={setSelectedCategoryId}
-        loading={loading}
-      />
-    </div>
+    <>
+      <Toaster position="bottom-right" reverseOrder={false} />
+      <GlobalLoader isLoading={loading} />
+      <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_#1f284a55,_transparent_65%)] py-12 pb-40 text-slate-200">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
+          <Header />
+          <CategorySelection
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
+            onCategorySelect={(id: string) => setSelectedCategoryId(id)}
+          />
+
+          {/* <ReportBuilderForm
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
+            setSelectedCategoryId={setSelectedCategoryId}
+            loading={loading}
+          /> */}
+        </div>
+      </main>
+    </>
   )
 }
 
