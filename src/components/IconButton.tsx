@@ -2,14 +2,15 @@ import type { ReactNode } from 'react'
 import type { MouseEventHandler } from 'react'
 
 type IconButtonProps = {
-  label: string
+  label?: string
   children: ReactNode
-  variant: 'ghost' | 'danger'
+  variant?: 'ghost' | 'danger'
   onClick?: MouseEventHandler<HTMLButtonElement>
   disabled?: boolean
+  className?: string
 }
 
-export default function IconButton({ label, children, variant, onClick, disabled = false }: IconButtonProps) {
+export default function IconButton({ label, children, variant = 'ghost', onClick, disabled = false, className = '' }: IconButtonProps) {
   const baseClasses =
     'inline-flex size-8 items-center justify-center rounded-lg border text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950'
 
@@ -26,7 +27,7 @@ export default function IconButton({ label, children, variant, onClick, disabled
     <button
       type="button"
       aria-label={label}
-      className={`${baseClasses} ${variantClasses} ${disabledClasses}`}
+      className={`${baseClasses} ${variantClasses} ${disabledClasses} ${className}`}
       onClick={onClick}
       disabled={disabled}
     >

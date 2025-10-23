@@ -936,3 +936,705 @@ All API errors follow this format:
 
 *Document Version: 1.0*  
 *Last Updated: October 19, 2025*
+
+
+        {(isCreatingNewReport || isEditingReport) && (
+          <div className={`overflow-hidden transition-all duration-500 ease-in-out ${isCreatingNewReport || isEditingReport ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
+            <SectionCard
+              step={2}
+              title={isEditingReport ? `Edit Report: ${editingReportName}` : "Create New Report"}
+              description={isEditingReport ? "Update the report configuration." : "Enter details for your new report category and name."}
+              footer={
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isEditingReport) {
+                        handleCancelEdit()
+                      } else {
+                        setIsCreatingNewReport(false)
+                        setNewCategoryName('')
+                        setNewReportName('')
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                  >
+                    {isEditingReport ? 'Cancel' : 'Hide Form'}
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-6">
+                {!isEditingReport && (
+                  <FieldGroup label="New Category Name">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Enter category name"
+                      className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                    />
+                  </FieldGroup>
+                )}
+                <FieldGroup label={isEditingReport ? "Report Name" : "Report Name"}>
+                  <input
+                    type="text"
+                    value={newReportName}
+                    onChange={(e) => setNewReportName(e.target.value)}
+                    placeholder="Enter report name"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                  />
+                </FieldGroup>
+              </div>
+            </SectionCard>
+          </div>
+        )}
+
+        {!isCreatingNewReport && (
+          <SectionCard
+            step={2}
+            title={`Category Reports: ${selectedCategory?.name ?? 'Select a category'}`}
+            description="Review existing reports or manage them directly."
+          >
+          <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40">
+            <table className="min-w-full divide-y divide-slate-800 text-sm">
+              <thead className="bg-slate-900/80 text-slate-400">
+                <tr>
+                  <th scope="col" className="px-4 py-3 text-left font-medium">
+                    Name
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium">
+                    Report Number
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium">
+                    Status
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium">
+                    Version
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium">
+                    Last Updated
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {reports.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                      No reports available for this category yet.
+                    </td>
+                  </tr>
+                ) : (
+                  reports.map((report) => (
+                    <tr key={report.id} className="bg-slate-950/60 hover:bg-slate-900/40">
+                      <td className="px-4 py-3 font-medium text-slate-200">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-slate-50">{report.name}</span>
+                          <span className="text-xs font-normal text-slate-400">
+                            {report.description ?? 'No description'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-400">{report.number}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={[
+                            'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide',
+                            report.status === 'active'
+                              ? 'bg-emerald-500/15 text-emerald-300'
+                              : report.status === 'draft'
+                              ? 'bg-amber-500/15 text-amber-300'
+                              : 'bg-slate-500/15 text-slate-300',
+                          ].join(' ')}
+                        >
+                          {report.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">{report.version}</td>
+                      <td className="px-4 py-3 text-slate-400">{formatDate(report.updatedAt)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewReport(report.id, report.name)}
+                            className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:ring-emerald-300"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditReport(report.id, report.name)}
+                            className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:ring-sky-300"
+                          >
+                            Edit
+                          </button>
+                          <ActionButton label={`Delete ${report.name}`} tone="danger">
+                            Delete
+                          </ActionButton>
+                          <ActionButton label={`Execute ${report.name}`} tone="info">
+                            Execute
+                          </ActionButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          </SectionCard>
+        )}
+
+        <SectionCard
+          step={3}
+          title="Data Source"
+          description="Select the tables and fields that will feed this report."
+        >
+          <div className="grid gap-6 md:grid-cols-2">
+            <ListPanel
+              title="Available Tables"
+              items={availableTableLabels}
+              onItemClick={handleSelectTable}
+              selectedItems={selectedTableLabels}
+              emptyMessage="No tables available."
+            />
+            <ListPanel
+              title="Selected Tables"
+              items={selectedTableLabels}
+              emptyMessage="Select a table from the left to include it."
+              actionRenderer={(item) => (
+                <IconButton
+                  key={`${item}-remove`}
+                  label={`Remove ${item}`}
+                  variant="danger"
+                  onClick={handleClearSelectedTable}
+                >
+                  X
+                </IconButton>
+              )}
+            />
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          step={4}
+          title="Select Fields & Print Order"
+          description="Arrange the fields that will appear in your report."
+        >
+          <div className="grid gap-6 md:grid-cols-2">
+            <ListPanel
+              title="Available Fields"
+              items={availableFieldOptions}
+              onItemClick={handleAddFieldToPrint}
+              emptyMessage={
+                !selectedTable
+                  ? 'Please select a table first.'
+                  : availableFieldOptions.length === 0 && printFields.length > 0
+                  ? 'All fields are already selected.'
+                  : 'No fields available for this table.'
+              }
+              loading={isTableFieldsLoading}
+            />
+            <ListPanel
+              title="Fields to Print (In Order)"
+              items={printFields}
+              numbered
+              actionRenderer={(item, index) => (
+                <>
+                  <IconButton
+                    label={`Move ${item} up`}
+                    variant="ghost"
+                    onClick={() => handleMoveField(item, 'up')}
+                    disabled={index === 0}
+                  >
+                    Up
+                  </IconButton>
+                  <IconButton
+                    label={`Move ${item} down`}
+                    variant="ghost"
+                    onClick={() => handleMoveField(item, 'down')}
+                    disabled={index === printFields.length - 1}
+                  >
+                    Dn
+                  </IconButton>
+                  <IconButton
+                    label={`Remove ${item}`}
+                    variant="danger"
+                    onClick={() => handleRemoveFieldFromPrint(item)}
+                  >
+                    X
+                  </IconButton>
+                </>
+              )}
+            />
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          step={5}
+          title="Select Fields to Sum"
+          description="Choose numeric fields that should be aggregated."
+        >
+          <div className="grid gap-6 md:grid-cols-2">
+            <ListPanel
+              title="Available Fields"
+              items={availableSummaryFieldOptions}
+              onItemClick={handleAddSummaryField}
+              emptyMessage={
+                !selectedTable
+                  ? 'Please select a table first.'
+                  : availableSummaryFieldOptions.length === 0 && sumFields.length > 0
+                  ? 'All fields are currently selected to sum.'
+                  : 'No fields available for this table.'
+              }
+            />
+            <ListPanel
+              title="Fields to Sum"
+              items={sumFields}
+              numbered
+              emptyMessage="Select a field from the left to add it."
+              actionRenderer={(item, index) => (
+                <>
+                  <IconButton
+                    label={`Move ${item} up`}
+                    variant="ghost"
+                    onClick={() => handleMoveSummaryField(item, 'up')}
+                    disabled={index === 0}
+                  >
+                    Up
+                  </IconButton>
+                  <IconButton
+                    label={`Move ${item} down`}
+                    variant="ghost"
+                    onClick={() => handleMoveSummaryField(item, 'down')}
+                    disabled={index === sumFields.length - 1}
+                  >
+                    Dn
+                  </IconButton>
+                  <IconButton
+                    label={`Remove ${item}`}
+                    variant="danger"
+                    onClick={() => handleRemoveSummaryField(item)}
+                  >
+                    X
+                  </IconButton>
+                </>
+              )}
+            />
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          step={6}
+          title="Select Sort"
+          description="Define the default ordering of your report output."
+        >
+          <div className="grid gap-6 md:grid-cols-2">
+            <FieldGroup label="Sort Field">
+              <SelectField
+                name="sort-field"
+                placeholder="Select a field to sort by"
+                options={availableFields} // <-- Only per-table API fields
+              />
+            </FieldGroup>
+            <FieldGroup label="Sort Order">
+              <SelectField
+                name="sort-order"
+                placeholder="Select sort order"
+                options={sortOrders.length > 0 ? sortOrders : ['Ascending', 'Descending']}
+              />
+            </FieldGroup>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          step={7}
+          title="Select Filters"
+          description="Add conditions to limit the dataset before summarization."
+          footer={
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+              >
+                + Add Condition
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            {filterConditions.map((condition, index) => (
+              <div
+                key={`${condition.field}-${index.toString()}`}
+                className="grid gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),minmax(0,1fr),auto] md:items-center"
+              >
+                <SelectField
+                  name={`filter-field-${index.toString()}`}
+                  placeholder="Select field"
+                  options={availableFields} // <-- Only API field list
+                />
+                <SelectField
+                  name={`filter-operator-${index.toString()}`}
+                  placeholder="Select operator"
+                  options={['equal to', 'not equal to', 'greater than', 'less than']}
+                />
+                <input
+                  type="text"
+                  placeholder="Enter value"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                />
+                <ActionButton label={`Remove filter condition ${index + 1}`} tone="danger">
+                  Remove
+                </ActionButton>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          step={8}
+          title="Grouping & Summarization"
+          description="Group records and apply aggregate functions."
+          footer={
+            <div className="flex justify-between">
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-400">
+                <input
+                  type="checkbox"
+                  defaultChecked
+                  className="size-4 rounded border border-slate-700 bg-slate-950 text-sky-500 focus:ring-2 focus:ring-sky-500/50"
+                />
+                Show Groups Only
+              </label>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+              >
+                + Add
+              </button>
+            </div>
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),auto] md:items-center">
+            <FieldGroup label="Group By (1)">
+              <SelectField
+                name="group-by"
+                placeholder="Select field to group by"
+                options={availableFields} // <-- Only API field list
+              />
+            </FieldGroup>
+            <FieldGroup label="Fields to Summarize">
+              <SelectField
+                name="summary-field"
+                placeholder="Select field to summarize"
+                options={availableFields} // <-- Only API field list, not previously filtered set
+              />
+            </FieldGroup>
+            <ActionButton label="Remove grouping rule" tone="danger">
+              Remove
+            </ActionButton>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          step={9}
+          title="Aggregate Filters (HAVING)"
+          description="Filter aggregated data after grouping has been applied."
+          footer={
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+              >
+                + Add Condition
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            {aggregateFilters.map((condition, index) => (
+              <div
+                key={`${condition.field}-${index.toString()}-agg`}
+                className="grid gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),minmax(0,1fr),auto] md:items-center"
+              >
+                <SelectField
+                  name={`aggregate-field-${index.toString()}`}
+                  placeholder="Select field"
+                  options={availableFields} // <-- Only fields from API
+                />
+                <SelectField
+                  name={`aggregate-operator-${index.toString()}`}
+                  placeholder="Select operator"
+                  options={['greater than', 'less than', 'equal to']}
+                />
+                <input
+                  type="text"
+                  placeholder="Enter value"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                />
+                <ActionButton label={`Remove aggregate filter ${index + 1}`} tone="danger">
+                  Remove
+                </ActionButton>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        {/* Join Button */}
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={toggleJoinSections}
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 transition-all duration-300 hover:bg-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          >
+            <span aria-hidden className={`transition-transform duration-300 ${showJoinSections ? 'rotate-180' : ''}`}>⚡</span>
+            {showJoinSections ? 'Hide Join' : 'Join'}
+          </button>
+        </div>
+
+        {/* Join Sections - With Animation */}
+        <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showJoinSections ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className="space-y-6">
+            <SectionCard
+              step={10}
+              title="Manual Join Query (Optional)"
+              description="Provide a custom JOIN clause to combine additional tables."
+              footer={
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={toggleJoinSections}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                  >
+                    Hide Join Query
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-2">
+                <textarea
+                  rows={4}
+                  value={joinQuery}
+                  onChange={(e) => setJoinQuery(e.target.value)}
+                  placeholder="LEFT JOIN Customer_Record cr ON Waste_Management_Data.customer = cr.customer_id"
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-3 text-sm text-slate-200 shadow-inner shadow-slate-950/40 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                />
+                <p className="text-xs text-slate-500">
+                  Note: You may need to add fields from the joined tables to the &ldquo;Print
+                  Order&rdquo; section manually.
+                </p>
+              </div>
+            </SectionCard>
+            <SectionCard
+              step={11}
+              title="Select Fields & Print Order (Joined Data)"
+              description="Choose which joined table fields appear and in what order."
+            >
+              <div className="grid gap-6 md:grid-cols-2">
+                <ListPanel
+                  title="Available Fields"
+                  items={availableJoinedFieldOptions}
+                  onItemClick={handleAddJoinedField}
+                  emptyMessage={
+                    joinQuery.trim()
+                      ? 'Enter table names in the JOIN query above to see available fields.'
+                      : 'All joined fields are already selected.'
+                  }
+                />
+                <ListPanel
+                  title="Fields to Print (In Order)"
+                  items={joinedPrintFields}
+                  numbered
+                  emptyMessage="Select a joined field from the left to include it."
+                  actionRenderer={(item, index) => (
+                    <>
+                      <IconButton
+                        label={`Move ${item} up`}
+                        variant="ghost"
+                        onClick={() => handleMoveJoinedField(item, 'up')}
+                        disabled={index === 0}
+                      >
+                        Up
+                      </IconButton>
+                      <IconButton
+                        label={`Move ${item} down`}
+                        variant="ghost"
+                        onClick={() => handleMoveJoinedField(item, 'down')}
+                        disabled={index === joinedPrintFields.length - 1}
+                      >
+                        Dn
+                      </IconButton>
+                      <IconButton
+                        label={`Remove ${item}`}
+                        variant="danger"
+                        onClick={() => handleRemoveJoinedField(item)}
+                      >
+                        X
+                      </IconButton>
+                    </>
+                  )}
+                />
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              step={12}
+              title="Grouping & Summarization (Joined Data)"
+              description="Apply grouping rules to data coming from joined tables."
+              footer={
+                <div className="flex justify-between">
+                  <label className="flex items-center gap-2 text-xs font-medium text-slate-400">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border border-slate-700 bg-slate-950 text-sky-500 focus:ring-2 focus:ring-sky-500/50"
+                    />
+                    Show Groups Only
+                  </label>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                  >
+                    + Add
+                  </button>
+                </div>
+              }
+            >
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),auto] md:items-center">
+                <FieldGroup label="Group By">
+                  <SelectField
+                    name="joined-group-by"
+                    placeholder="Select group by field"
+                    options={joinedAvailableFields}
+                  />
+                </FieldGroup>
+                <FieldGroup label="Fields to Summarize">
+                  <SelectField
+                    name="joined-summary-field"
+                    placeholder="Select field to summarize"
+                    options={joinedAvailableFields}
+                  />
+                </FieldGroup>
+                <ActionButton label="Remove grouping rule" tone="danger">
+                  Remove
+                </ActionButton>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              step={13}
+              title="Aggregate Filters (HAVING - Joined Data)"
+              description="Apply aggregate filters to joined datasets."
+              footer={
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                  >
+                    + Add Condition
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-3">
+                {joinedAggregateFilters.map((condition, index) => (
+                  <div
+                    key={`${condition.field}-${index.toString()}-joined-agg`}
+                    className="grid gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr),minmax(0,1fr),auto] md:items-center"
+                  >
+                    <SelectField
+                      name={`joined-aggregate-field-${index.toString()}`}
+                      placeholder="Select field"
+                      options={joinedAvailableFields}
+                    />
+                    <SelectField
+                      name={`joined-aggregate-operator-${index.toString()}`}
+                      placeholder="Select operator"
+                      options={['greater than', 'less than', 'equal to']}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Enter value"
+                      className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-inner shadow-slate-950/40 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                    />
+                    <ActionButton label={`Remove joined aggregate filter ${index + 1}`} tone="danger">
+                      Remove
+                    </ActionButton>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          </div>
+        </div>
+
+        {isTableFieldsLoading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/60"><GlobalLoader isLoading={true} /></div>}
+      </div>
+    </main>
+
+    <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-slate-800 bg-slate-950/80 py-6 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 lg:px-8">
+        <p className="text-sm text-slate-400">
+          Review your selections before saving. You can adjust these settings later.
+        </p>
+        <button
+          type="button"
+          onClick={handleSaveReport}
+          className="inline-flex items-center gap-3 rounded-lg bg-sky-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+        >
+          Save Report
+        </button>
+      </div>
+    </div>
+
+    {/* SQL Query Modal */}
+    {isViewingSQLQuery && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+        <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+            <h2 className="text-2xl font-bold text-slate-100">Generated SQL Query</h2>
+            <button
+              type="button"
+              onClick={() => setIsViewingSQLQuery(false)}
+              className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+              aria-label="Close modal"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-6">
+              <pre className="overflow-x-auto text-base leading-relaxed text-emerald-400 whitespace-pre-wrap">
+                <code>{currentSQLQuery}</code>
+              </pre>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-slate-800 px-6 py-4">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(currentSQLQuery)
+                toast.success('SQL query copied to clipboard!')
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy Query
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsViewingSQLQuery(false)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-800"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    )}

@@ -16,6 +16,7 @@ export type ApiReport = {
   description: string
   status: string
   version: number
+  createdAt?: string
   updatedAt: string
 }
 

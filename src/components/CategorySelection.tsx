@@ -1,4 +1,4 @@
-import SectionCard from './SectionCard.tsx'
+import SectionCard from './common/SectionCard.tsx'
 import type { Category } from '../types'
 
 type CategorySelectionProps = {
@@ -16,19 +16,11 @@ export default function CategorySelection({
     <SectionCard
       step={1}
       title="Select a Category"
+      isNewButton={true}
       description="Choose the segment you want to manage reports for."
-      footer={
-        <div className="flex justify-center">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-          >
-            <span aria-hidden>+</span>
-            New Report
-          </button>
-        </div>
-      }
+     
     >
+      
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {categories.map((category) => {
           const isSelected = category.id === selectedCategoryId
