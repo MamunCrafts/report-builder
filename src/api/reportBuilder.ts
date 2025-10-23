@@ -192,27 +192,48 @@ export async function createCategory(
   description?: string,
   signal?: AbortSignal,
 ): Promise<ApiCategory> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/create-category`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name,
-      description: description ?? '',
-    }),
-    signal,
-  })
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/create-category`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        description: description ?? '',
+      }),
+      signal,
+    })
 
-  if (!response.ok) {
-    throw new Error(`Failed to create category (status ${response.status}).`)
+    if (!response.ok) {
+      // Try to include response body for better debugging (server may return HTML error page)
+      const text = await response.text().catch(() => '')
+      if (response.status === 404) {
+        throw new Error(
+          `Failed to create category (status 404). Endpoint not found. Response body: ${text}`,
+        )
+      }
+      throw new Error(`Failed to create category (status ${response.status}). Response body: ${text}`)
+    }
+
+    const contentType = response.headers.get('content-type') ?? ''
+    if (!contentType.includes('application/json')) {
+      const text = await response.text().catch(() => '')
+      throw new Error(`Expected JSON response from create-category but received: ${text}`)
+    }
+
+    const payload = await response.json()
+
+    if (!payload?.success) {
+      throw new Error(payload?.message ?? 'Unexpected create category API response.')
+    }
+
+    return payload.data as ApiCategory
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error
+    }
+    // Re-throw with the same message so caller sees readable info
+    throw error
   }
-
-  const payload = await response.json()
-
-  if (!payload?.success) {
-    throw new Error(payload?.message ?? 'Unexpected create category API response.')
-  }
-
-  return payload.data as ApiCategory
 }
 
 export async function updateCategory(
@@ -221,24 +242,41 @@ export async function updateCategory(
   description?: string,
   signal?: AbortSignal,
 ): Promise<ApiCategory> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/update-category`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, name, description: description ?? '' }),
-    signal,
-  })
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/update-category`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, name, description: description ?? '' }),
+      signal,
+    })
 
-  if (!response.ok) {
-    throw new Error(`Failed to update category (status ${response.status}).`)
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      if (response.status === 404) {
+        throw new Error(`Failed to update category (status 404). Endpoint not found. Response body: ${text}`)
+      }
+      throw new Error(`Failed to update category (status ${response.status}). Response body: ${text}`)
+    }
+
+    const contentType = response.headers.get('content-type') ?? ''
+    if (!contentType.includes('application/json')) {
+      const text = await response.text().catch(() => '')
+      throw new Error(`Expected JSON response from update-category but received: ${text}`)
+    }
+
+    const payload = await response.json()
+
+    if (!payload?.success) {
+      throw new Error(payload?.message ?? 'Unexpected update category API response.')
+    }
+
+    return payload.data as ApiCategory
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error
+    }
+    throw error
   }
-
-  const payload = await response.json()
-
-  if (!payload?.success) {
-    throw new Error(payload?.message ?? 'Unexpected update category API response.')
-  }
-
-  return payload.data as ApiCategory
 }
 
 export async function createReport(
@@ -248,29 +286,46 @@ export async function createReport(
   description?: string,
   signal?: AbortSignal,
 ): Promise<ApiReport> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/create-report`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      categoryId,
-      name,
-      number: number ?? '',
-      description: description ?? '',
-    }),
-    signal,
-  })
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/create-report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        categoryId,
+        name,
+        number: number ?? '',
+        description: description ?? '',
+      }),
+      signal,
+    })
 
-  if (!response.ok) {
-    throw new Error(`Failed to create report (status ${response.status}).`)
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      if (response.status === 404) {
+        throw new Error(`Failed to create report (status 404). Endpoint not found. Response body: ${text}`)
+      }
+      throw new Error(`Failed to create report (status ${response.status}). Response body: ${text}`)
+    }
+
+    const contentType = response.headers.get('content-type') ?? ''
+    if (!contentType.includes('application/json')) {
+      const text = await response.text().catch(() => '')
+      throw new Error(`Expected JSON response from create-report but received: ${text}`)
+    }
+
+    const payload = await response.json()
+
+    if (!payload?.success) {
+      throw new Error(payload?.message ?? 'Unexpected create report API response.')
+    }
+
+    return payload.data as ApiReport
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error
+    }
+    throw error
   }
-
-  const payload = await response.json()
-
-  if (!payload?.success) {
-    throw new Error(payload?.message ?? 'Unexpected create report API response.')
-  }
-
-  return payload.data as ApiReport
 }
 
 export async function saveReportConfiguration(

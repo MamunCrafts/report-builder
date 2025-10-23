@@ -176,6 +176,223 @@ app.get('/api/v1/get-categories', async (_req, res) => {
   }
 })
 
+app.post('/api/v1/create-category', async (req, res) => {
+  try {
+    const { name, description } = req.body
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Category name is required.',
+      })
+    }
+
+    // Check if category with same name already exists
+    const [existingRows] = await pool.query(
+      'SELECT id FROM categories WHERE name = ? AND is_active = 1',
+      [name.trim()],
+    )
+
+    if (existingRows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'A category with this name already exists.',
+      })
+    }
+
+    // Get the next display order
+    const [maxOrderRows] = await pool.query(
+      'SELECT COALESCE(MAX(display_order), 0) + 1 AS next_order FROM categories',
+    )
+    const nextOrder = maxOrderRows[0].next_order
+
+    // Insert new category
+    const [result] = await pool.query(
+      'INSERT INTO categories (name, description, display_order, is_active) VALUES (?, ?, ?, 1)',
+      [name.trim(), description?.trim() || '', nextOrder],
+    )
+
+    const newCategory = {
+      id: String(result.insertId),
+      name: name.trim(),
+      description: description?.trim() || '',
+      reportCount: 0,
+      productCount: 0,
+      displayOrder: nextOrder,
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Category created successfully.',
+      data: newCategory,
+    })
+  } catch (error) {
+    console.error('Failed to create category', error)
+    res.status(500).json({
+      success: false,
+      message: 'Unable to create category.',
+      error: error.message,
+    })
+  }
+})
+
+app.put('/api/v1/update-category', async (req, res) => {
+  try {
+    const { id, name, description } = req.body
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Category ID is required.',
+      })
+    }
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Category name is required.',
+      })
+    }
+
+    // Check if category exists
+    const [existingRows] = await pool.query(
+      'SELECT id, display_order FROM categories WHERE id = ? AND is_active = 1',
+      [id],
+    )
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Category not found.',
+      })
+    }
+
+    // Check if another category with the same name exists
+    const [duplicateRows] = await pool.query(
+      'SELECT id FROM categories WHERE name = ? AND id != ? AND is_active = 1',
+      [name.trim(), id],
+    )
+
+    if (duplicateRows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'A category with this name already exists.',
+      })
+    }
+
+    // Update category
+    await pool.query(
+      'UPDATE categories SET name = ?, description = ? WHERE id = ?',
+      [name.trim(), description?.trim() || '', id],
+    )
+
+    // Get updated category with counts
+    const [updatedRows] = await pool.query(
+      `SELECT c.id,
+              c.name,
+              c.description,
+              c.display_order,
+              COUNT(DISTINCT r.id) AS report_count,
+              COUNT(DISTINCT p.id) AS product_count
+         FROM categories c
+         LEFT JOIN reports r ON r.category_id = c.id AND r.status != 'deleted'
+         LEFT JOIN products p ON p.category_id = c.id AND p.is_active = 1
+         WHERE c.id = ? AND c.is_active = 1
+         GROUP BY c.id, c.name, c.description, c.display_order`,
+      [id],
+    )
+
+    const updatedCategory = {
+      id: String(updatedRows[0].id),
+      name: updatedRows[0].name,
+      description: updatedRows[0].description ?? '',
+      reportCount: Number(updatedRows[0].report_count ?? 0),
+      productCount: Number(updatedRows[0].product_count ?? 0),
+      displayOrder: updatedRows[0].display_order,
+    }
+
+    res.json({
+      success: true,
+      message: 'Category updated successfully.',
+      data: updatedCategory,
+    })
+  } catch (error) {
+    console.error('Failed to update category', error)
+    res.status(500).json({
+      success: false,
+      message: 'Unable to update category.',
+      error: error.message,
+    })
+  }
+})
+
+app.post('/api/v1/create-report', async (req, res) => {
+  try {
+    const { categoryId, name, number, description } = req.body
+
+    if (!categoryId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Category ID is required.',
+      })
+    }
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Report name is required.',
+      })
+    }
+
+    // Verify category exists
+    const [categoryRows] = await pool.query(
+      'SELECT id FROM categories WHERE id = ? AND is_active = 1',
+      [categoryId],
+    )
+
+    if (categoryRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Category not found.',
+      })
+    }
+
+    // Generate report number if not provided
+    const reportNumber = number?.trim() || `RPT-${Date.now()}`
+
+    // Insert new report
+    const [result] = await pool.query(
+      `INSERT INTO reports (category_id, name, report_number, description, status, version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'draft', 1, NOW(), NOW())`,
+      [categoryId, name.trim(), reportNumber, description?.trim() || ''],
+    )
+
+    const newReport = {
+      id: String(result.insertId),
+      name: name.trim(),
+      number: reportNumber,
+      description: description?.trim() || '',
+      status: 'draft',
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Report created successfully.',
+      data: newReport,
+    })
+  } catch (error) {
+    console.error('Failed to create report', error)
+    res.status(500).json({
+      success: false,
+      message: 'Unable to create report.',
+      error: error.message,
+    })
+  }
+})
+
 app.get('/api/v1/data-sources', async (_req, res) => {
   try {
     const [rows] = await pool.query(

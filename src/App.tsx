@@ -27,6 +27,16 @@ function App() {
     fetchData()
   }, [])
 
+  const fetchAndSetCategories = async () => {
+    try {
+      const cats = await fetchCategories()
+      setCategories(cats)
+    } catch (err) {
+      // don't surface to UI here; keep current categories
+      console.error('Failed to refresh categories', err)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -54,6 +64,7 @@ function App() {
             categories={categories}
             selectedCategoryId={selectedCategoryId}
             onCategorySelect={(id: string) => setSelectedCategoryId(id)}
+            onCategoryChanged={fetchAndSetCategories}
           />
 
           {/* <ReportBuilderForm
