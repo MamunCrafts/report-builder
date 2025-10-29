@@ -41,7 +41,6 @@ export default function ReportBuilderForm({
   const [printFields, setPrintFields] = useState<string[]>([])
   const [sumFields, setSumFields] = useState<string[]>([])
   const [joinedPrintFields, setJoinedPrintFields] = useState<string[]>([])
-  const [showJoinSections, setShowJoinSections] = useState<boolean>(false)
   const [filterConditions, setFilterConditions] = useState<
     Array<{ field: string; operator: string; value: string }>
   >([])
@@ -284,10 +283,6 @@ export default function ReportBuilderForm({
 
   const handleRemoveJoinedField = (fieldName: string) => {
     setJoinedPrintFields((current) => current.filter((field) => field !== fieldName))
-  }
-
-  const toggleJoinSections = () => {
-    setShowJoinSections((current) => !current)
   }
 
 
@@ -900,53 +895,39 @@ export default function ReportBuilderForm({
             description="Combine data from multiple tables using SQL JOIN statements."
           >
             <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <ActionButton
-                  onClick={toggleJoinSections}
-                  variant="secondary"
-                  size="sm"
-                >
-                  {showJoinSections ? 'Hide' : 'Show'} JOIN Sections
-                </ActionButton>
+              <FieldGroup label="">
+                <textarea
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200"
+                  value={joinQuery}
+                  onChange={(e) => setJoinQuery((e.target as HTMLTextAreaElement).value)}
+                  placeholder="Enter SQL JOIN query (e.g., JOIN Orders ON Users.id = Orders.user_id)"
+                  rows={4}
+                />
+              </FieldGroup>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <ListPanel
+                  title="Available Joined Fields"
+                  items={availableJoinedFieldOptions}
+                  onItemClick={handleAddJoinedField}
+                  selectedItems={[]}
+                  emptyMessage="Enter a JOIN query to see available fields."
+                />
+                <ListPanel
+                  title="Selected Joined Fields"
+                  items={joinedPrintFields}
+                  onItemClick={handleRemoveJoinedField}
+                  selectedItems={[]}
+                  emptyMessage="No joined fields selected."
+                  actionRenderer={(item) => (
+                    <div className="flex items-center gap-2">
+                      <IconButton label={`Move ${item} up`} variant="ghost">↑</IconButton>
+                      <IconButton label={`Move ${item} down`} variant="ghost">↓</IconButton>
+                      <IconButton label={`Remove ${item}`} variant="danger" onClick={() => handleRemoveJoinedField(item)}>×</IconButton>
+                    </div>
+                  )}
+                />
               </div>
-
-              {showJoinSections && (
-                <>
-                  <FieldGroup label="JOIN Query">
-                    <textarea
-                      className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200"
-                      value={joinQuery}
-                      onChange={(e) => setJoinQuery((e.target as HTMLTextAreaElement).value)}
-                      placeholder="Enter SQL JOIN query (e.g., JOIN Orders ON Users.id = Orders.user_id)"
-                      rows={4}
-                    />
-                  </FieldGroup>
-
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <ListPanel
-                      title="Available Joined Fields"
-                      items={availableJoinedFieldOptions}
-                      onItemClick={handleAddJoinedField}
-                      selectedItems={[]}
-                      emptyMessage="Enter a JOIN query to see available fields."
-                    />
-                    <ListPanel
-                      title="Selected Joined Fields"
-                      items={joinedPrintFields}
-                      onItemClick={handleRemoveJoinedField}
-                      selectedItems={[]}
-                      emptyMessage="No joined fields selected."
-                      actionRenderer={(item) => (
-                        <div className="flex items-center gap-2">
-                          <IconButton label={`Move ${item} up`} variant="ghost">↑</IconButton>
-                          <IconButton label={`Move ${item} down`} variant="ghost">↓</IconButton>
-                          <IconButton label={`Remove ${item}`} variant="danger" onClick={() => handleRemoveJoinedField(item)}>×</IconButton>
-                        </div>
-                      )}
-                    />
-                  </div>
-                </>
-              )}
             </div>
           </SectionCard>
 
