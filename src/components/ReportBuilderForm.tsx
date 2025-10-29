@@ -10,9 +10,6 @@ import {
   fetchReportBuilderData,
   fetchDatabaseTables,
   fetchTableFields,
-  saveReportConfiguration,
-  getReportConfiguration,
-  updateReportConfiguration,
   type ReportBuilderData,
   type ApiDatabaseTable,
   type ReportBuilderConfiguration,
@@ -35,7 +32,9 @@ export default function ReportBuilderForm({
 }: ReportBuilderFormProps) {
   // mark prop as used (component no longer changes category from inside)
   void setSelectedCategoryId
-  const [data, setData] = useState<ReportBuilderData | null>(null)
+  void categories
+  void selectedCategoryId
+  void loading
   const [availableTables, setAvailableTables] = useState<ApiDatabaseTable[]>([])
   const [selectedTable, setSelectedTable] = useState<ApiDatabaseTable | null>(null)
   const [printFields, setPrintFields] = useState<string[]>([])
@@ -56,34 +55,7 @@ export default function ReportBuilderForm({
   const [isTableFieldsLoading, setIsTableFieldsLoading] = useState(false)
   const [joinQuery, setJoinQuery] = useState<string>('')
   const [joinedTableFields, setJoinedTableFields] = useState<string[]>([])
-  const [isCreatingNewReport, setIsCreatingNewReport] = useState<boolean>(false)
-  const [newCategoryName, setNewCategoryName] = useState<string>('')
-  const [newReportName, setNewReportName] = useState<string>('')
-  const [isEditingReport, setIsEditingReport] = useState<boolean>(false)
-  const [editingReportId, setEditingReportId] = useState<string | null>(null)
-  const [editingReportName, setEditingReportName] = useState<string>('')
-  const [isViewingSQLQuery, setIsViewingSQLQuery] = useState<boolean>(false)
-  const [currentSQLQuery, setCurrentSQLQuery] = useState<string>('')
   const [currentStep, setCurrentStep] = useState<number>(1) // Track which step is visible
-
-  const dateFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }),
-    [],
-  )
-
-  const formatDate = (value?: string | null) => {
-    if (!value) return '—'
-    try {
-      return dateFormatter.format(new Date(value))
-    } catch {
-      return value
-    }
-  }
 
   const formatDataSourceLabel = (
     source?:
@@ -124,13 +96,7 @@ export default function ReportBuilderForm({
         ])
 
         const dataSourcesList = Array.isArray(apiData.dataSources) ? apiData.dataSources : []
-        const normalizedData: ReportBuilderData = {
-          ...apiData,
-          dataSources: dataSourcesList,
-          categories: Array.isArray(apiData.categories) ? apiData.categories : [],
-        }
-        setData(normalizedData)
-        
+
         // Use database tables if available
         const tables: ApiDatabaseTable[] =
           Array.isArray(databaseTables) && databaseTables.length > 0
@@ -199,8 +165,6 @@ export default function ReportBuilderForm({
     return () => { ignore = true; controller.abort(); setIsTableFieldsLoading(false) }
   }, [selectedTable])
 
-  const reportCatalog = useMemo(() => data?.reportCatalog ?? {}, [data])
-  
   // Table-specific available fields (not global!)
   const availableFields = useMemo(() => {
     if (!selectedTable) return []
@@ -216,15 +180,6 @@ export default function ReportBuilderForm({
     return []
   }, [joinedTableFields])
 
-  const selectedCategory = useMemo(
-    () => categories.find((category) => category.id === selectedCategoryId),
-    [categories, selectedCategoryId],
-  )
-
-  const reports = useMemo(
-    () => reportCatalog[selectedCategoryId] ?? [],
-    [reportCatalog, selectedCategoryId],
-  )
   const selectedTables = selectedTable ? [selectedTable] : []
   
   // Helper values for ListPanel (which expects string arrays)
@@ -243,6 +198,39 @@ export default function ReportBuilderForm({
     () => joinedAvailableFields.filter((field) => !joinedPrintFields.includes(field)),
     [joinedAvailableFields, joinedPrintFields],
   )
+
+  const finalConfiguration = useMemo<ReportBuilderConfiguration>(() => {
+    return {
+      dataSource: selectedTable?.name ?? '',
+      dataSourceLabel: selectedTable?.label ?? '',
+      selectedTables: selectedTable ? [selectedTable.name] : [],
+      selectedFields: printFields,
+      printOrderFields: printFields,
+      summaryFields: sumFields,
+      sortFields: [], // Sorting UI not implemented yet
+      sortOrders: [],
+      filterConditions,
+      groupByFields: [],
+      aggregateFilters,
+      joinQuery,
+      joinedAvailableFields: joinedTableFields,
+      joinedPrintOrderFields: joinedPrintFields,
+      joinedGroupByFields: [],
+      joinedAggregateFilters,
+    }
+  }, [
+    selectedTable,
+    printFields,
+    sumFields,
+    filterConditions,
+    aggregateFilters,
+    joinQuery,
+    joinedTableFields,
+    joinedPrintFields,
+    joinedAggregateFilters,
+  ])
+
+  const finalSql = useMemo(() => generateSQLQuery(finalConfiguration), [finalConfiguration])
 
   const handleSelectTable = (tableLabel: string) => {
     const table = availableTables.find((t) => t.label === tableLabel)
@@ -285,139 +273,27 @@ export default function ReportBuilderForm({
     setJoinedPrintFields((current) => current.filter((field) => field !== fieldName))
   }
 
-
-
-
-  const handleSaveReport = async () => {
-    // For edit mode, only report name is required. For create mode, both are required
-    if (!isEditingReport && (!newCategoryName.trim() || !newReportName.trim())) {
-      const errorMsg = 'Please enter both category name and report name.'
-      toast.error(errorMsg)
+  const handleSaveSql = async () => {
+    const trimmedSql = finalSql.trim()
+    if (!trimmedSql) {
+      toast.error('SQL query is empty. Select a table and fields first.')
       return
     }
-
-    if (!newReportName.trim()) {
-      const errorMsg = 'Please enter a report name.'
-      toast.error(errorMsg)
-      return
-    }
-
     try {
-      // Build configuration from current state
-      const configuration: ReportBuilderConfiguration = {
-        dataSource: selectedTable?.name ?? '',
-        dataSourceLabel: selectedTable?.label ?? '',
-        selectedTables: selectedTable ? [selectedTable.name] : [],
-        selectedFields: printFields,
-        printOrderFields: printFields,
-        summaryFields: sumFields,
-        sortFields: [], // TODO: Add sort field state
-        sortOrders: [], // TODO: Add sort order state
-        filterConditions: filterConditions,
-        groupByFields: [], // TODO: Add grouping state
-        aggregateFilters: aggregateFilters,
-        joinQuery: joinQuery,
-        joinedAvailableFields: joinedTableFields,
-        joinedPrintOrderFields: joinedPrintFields,
-        joinedGroupByFields: [], // TODO: Add joined grouping state
-        joinedAggregateFilters: joinedAggregateFilters,
-      }
-
-      if (isEditingReport && editingReportId) {
-        // Update existing report
-        await updateReportConfiguration(
-          editingReportId,
-          configuration,
-        )
-        toast.success(`Report "${newReportName}" updated successfully!`)
-        handleCancelEdit()
+      if ('clipboard' in navigator && navigator.clipboard) {
+        await navigator.clipboard.writeText(trimmedSql)
+        toast.success('SQL query copied to clipboard.')
       } else {
-        // Create new report
-        await saveReportConfiguration(
-          newCategoryName.trim(),
-          newReportName.trim(),
-          configuration,
-        )
-        toast.success(`Report "${newReportName}" created successfully!`)
-        setNewCategoryName('')
-        setNewReportName('')
-        setIsCreatingNewReport(false)
+        throw new Error('Clipboard API not available')
       }
-
-  // Note: categories are managed in parent component (parent will refresh as needed)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save report.'
-      toast.error(errorMessage)
+    } catch (copyError) {
+      console.warn('Failed to copy SQL query to clipboard.', copyError)
+      toast.success('SQL query ready. Copy it manually if needed.')
     }
   }
 
-  const handleEditReport = async (reportId: string, reportName: string) => {
-    try {
-      // Fetch the report configuration
-      const { configuration } = await getReportConfiguration(reportId)
 
-      // Set edit mode and populate form with existing data
-      setIsEditingReport(true)
-      setEditingReportId(reportId)
-      setEditingReportName(reportName)
-      setNewReportName(reportName)
 
-      // Find and select the table
-      if (configuration.dataSource) {
-        const table = availableTables.find((t) => t.name === configuration.dataSource)
-        if (table) {
-          setSelectedTable(table)
-        }
-      }
-
-      // Populate fields
-      setPrintFields(configuration.printOrderFields || [])
-      setSumFields(configuration.summaryFields || [])
-      setFilterConditions(configuration.filterConditions || [{ field: '', operator: '', value: '' }])
-      setAggregateFilters(configuration.aggregateFilters || [{ field: '', operator: '', value: '' }])
-      setJoinQuery(configuration.joinQuery || '')
-      setJoinedPrintFields(configuration.joinedPrintOrderFields || [])
-
-      // Scroll to top
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-
-      toast.success('Report loaded for editing')
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load report for editing.'
-      toast.error(errorMessage)
-    }
-  }
-
-  const handleCancelEdit = () => {
-    setIsEditingReport(false)
-    setEditingReportId(null)
-    setEditingReportName('')
-    setNewReportName('')
-    setPrintFields([])
-    setSumFields([])
-    setFilterConditions([{ field: '', operator: '', value: '' }])
-    setAggregateFilters([{ field: '', operator: '', value: '' }])
-    setJoinQuery('')
-    setJoinedPrintFields([])
-    setSelectedTable(null)
-  }
-
-  const handleViewReport = async (reportId: string, reportName: string) => {
-    try {
-      // Fetch the report configuration
-      const { configuration } = await getReportConfiguration(reportId)
-
-      // Generate SQL query
-      const sqlQuery = generateSQLQuery(configuration)
-      setCurrentSQLQuery(sqlQuery)
-      setIsViewingSQLQuery(true)
-
-      toast.success(`Loaded query for "${reportName}"`)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load report query.'
-      toast.error(errorMessage)
-    }
-  }
 
   // Parse table names from JOIN query and fetch their fields
   useEffect(() => {
@@ -968,161 +844,23 @@ export default function ReportBuilderForm({
         <>
           <SectionCard
             step={9}
-            title="Report Management"
-            description="Save, edit, or view existing reports."
+            title="Generated SQL"
+            description="Review the SQL query produced from your selections."
           >
-            <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <ActionButton
-                  onClick={() => setIsCreatingNewReport(true)}
-                  variant="primary"
-                  disabled={loading}
-                >
-                  Create New Report
-                </ActionButton>
-                <ActionButton
-                  onClick={() => {
-                    const config: ReportBuilderConfiguration = {
-                      dataSource: selectedTable?.name ?? '',
-                      dataSourceLabel: selectedTable?.label ?? '',
-                      selectedTables: selectedTable ? [selectedTable.name] : [],
-                      selectedFields: printFields,
-                      printOrderFields: printFields,
-                      summaryFields: sumFields,
-                      sortFields: [],
-                      sortOrders: [],
-                      filterConditions: filterConditions,
-                      groupByFields: [],
-                      aggregateFilters: aggregateFilters,
-                      joinQuery: joinQuery,
-                      joinedAvailableFields: joinedTableFields,
-                      joinedPrintOrderFields: joinedPrintFields,
-                      joinedGroupByFields: [],
-                      joinedAggregateFilters: joinedAggregateFilters,
-                    }
-                    const sqlQuery = generateSQLQuery(config)
-                    setCurrentSQLQuery(sqlQuery)
-                    setIsViewingSQLQuery(true)
-                  }}
-                  variant="secondary"
-                  disabled={!selectedTable}
-                >
-                  View SQL Query
-                </ActionButton>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-400">
+                The query updates automatically as you adjust tables, fields, and filters.
+              </p>
+              <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+                <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap text-sm text-slate-200">
+                  {finalSql.trim()
+                    ? finalSql
+                    : 'Select a data source and configure fields to generate the SQL query.'}
+                </pre>
               </div>
-
-              {isCreatingNewReport && (
-                <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-6">
-                  <h3 className="mb-4 text-lg font-semibold text-slate-200">Create New Report</h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <FieldGroup label="Category Name">
-                      <input
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName((e.target as HTMLInputElement).value)}
-                        placeholder="Enter category name"
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200"
-                      />
-                    </FieldGroup>
-                    <FieldGroup label="Report Name">
-                      <input
-                        value={newReportName}
-                        onChange={(e) => setNewReportName((e.target as HTMLInputElement).value)}
-                        placeholder="Enter report name"
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200"
-                      />
-                    </FieldGroup>
-                  </div>
-                  <div className="mt-4 flex gap-4">
-                    <ActionButton onClick={handleSaveReport} variant="primary" size="sm">
-                      Save Report
-                    </ActionButton>
-                    <ActionButton
-                      onClick={() => {
-                        setIsCreatingNewReport(false)
-                        setNewCategoryName('')
-                        setNewReportName('')
-                      }}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      Cancel
-                    </ActionButton>
-                  </div>
-                </div>
-              )}
-
-              {selectedCategory && (
-                <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-6">
-                  <h3 className="mb-4 text-lg font-semibold text-slate-200">
-                    Reports in {selectedCategory.name}
-                  </h3>
-                  {reports.length === 0 ? (
-                    <p className="text-slate-400">No reports in this category yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {reports.map((report) => (
-                        <div
-                          key={report.id}
-                          className="flex items-center justify-between rounded border border-slate-700 bg-slate-800/50 p-3"
-                        >
-                          <div>
-                            <p className="font-medium text-slate-200">{report.name}</p>
-                            <p className="text-sm text-slate-400">
-                              Created {formatDate(report.createdAt)} • Updated {formatDate(report.updatedAt)}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <ActionButton
-                              onClick={() => handleViewReport(report.id, report.name)}
-                              variant="secondary"
-                              size="sm"
-                            >
-                              View SQL
-                            </ActionButton>
-                            <ActionButton
-                              onClick={() => handleEditReport(report.id, report.name)}
-                              variant="secondary"
-                              size="sm"
-                            >
-                              Edit
-                            </ActionButton>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {isEditingReport && (
-                <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-6">
-                  <h3 className="mb-4 text-lg font-semibold text-slate-200">
-                    Editing: {editingReportName}
-                  </h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <FieldGroup label="Report Name">
-                      <input
-                        value={newReportName}
-                        onChange={(e) => setNewReportName((e.target as HTMLInputElement).value)}
-                        placeholder="Enter report name"
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-200"
-                      />
-                    </FieldGroup>
-                  </div>
-                  <div className="mt-4 flex gap-4">
-                    <ActionButton onClick={handleSaveReport} variant="primary" size="sm">
-                      Update Report
-                    </ActionButton>
-                    <ActionButton onClick={handleCancelEdit} variant="secondary" size="sm">
-                      Cancel
-                    </ActionButton>
-                  </div>
-                </div>
-              )}
             </div>
           </SectionCard>
 
-          {/* Navigation Buttons for Step 7 (Final Step) */}
           <div className="flex items-center justify-between gap-4 px-4">
             <button
               type="button"
@@ -1146,35 +884,15 @@ export default function ReportBuilderForm({
               <button
                 type="button"
                 className="rounded-lg bg-green-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                onClick={() => {
-                  toast.success('Report configuration complete! Use the buttons above to save your report.')
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                onClick={async () => {
+                  await handleSaveSql()
+                  window.location.href = '/'
                 }}
               >
-                Finish
+                Save
               </button>
             </div>
           </div>
-
-          {isViewingSQLQuery && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-lg border border-slate-700 bg-slate-900 p-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-200">Generated SQL Query</h3>
-                  <IconButton
-                    label="Close SQL modal"
-                    onClick={() => setIsViewingSQLQuery(false)}
-                    className="text-slate-400 hover:text-slate-200"
-                  >
-                    ×
-                  </IconButton>
-                </div>
-                <pre className="whitespace-pre-wrap rounded bg-slate-800 p-4 text-sm text-slate-300">
-                  {currentSQLQuery}
-                </pre>
-              </div>
-            </div>
-          )}
         </>
       )}
     </>
