@@ -65,6 +65,7 @@ export default function ReportBuilderForm({
   const [editingReportName, setEditingReportName] = useState<string>('')
   const [isViewingSQLQuery, setIsViewingSQLQuery] = useState<boolean>(false)
   const [currentSQLQuery, setCurrentSQLQuery] = useState<string>('')
+  const [currentStep, setCurrentStep] = useState<number>(1) // Track which step is visible
 
   const dateFormatter = useMemo(
     () =>
@@ -474,11 +475,13 @@ export default function ReportBuilderForm({
 
   return (
     <>
-      <SectionCard
-        step={3}
-        title="Data Source"
-        description="Select the tables and fields that will feed this report."
-      >
+      {currentStep === 1 && (
+        <>
+          <SectionCard
+            step={3}
+            title="Data Source"
+            description="Select the tables and fields that will feed this report."
+          >
             <div className="grid gap-6 md:grid-cols-2">
               <ListPanel
                 title="Available Tables"
@@ -497,6 +500,52 @@ export default function ReportBuilderForm({
             </div>
           </SectionCard>
 
+          {/* Navigation Buttons */}
+          <div className="flex items-center justify-between gap-4 px-4">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              onClick={() => {
+                // Navigate back to category selection
+                window.location.reload()
+              }}
+            >
+              Back
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                onClick={() => {
+                  // Cancel action
+                  if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+                    window.location.reload()
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => {
+                  if (!selectedTable) {
+                    toast.error('Please select a table first')
+                    return
+                  }
+                  setCurrentStep(2)
+                }}
+                disabled={!selectedTable}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {currentStep === 2 && (
+        <>
           <SectionCard
             step={4}
             title="Fields to Print"
@@ -527,6 +576,43 @@ export default function ReportBuilderForm({
             </div>
           </SectionCard>
 
+          {/* Navigation Buttons for Step 2 */}
+          <div className="flex items-center justify-between gap-4 px-4">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              onClick={() => setCurrentStep(1)}
+            >
+              Back
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                onClick={() => {
+                  if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+                    window.location.reload()
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onClick={() => {
+                  setCurrentStep(3)
+                }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {currentStep === 3 && (
+        <>
           <SectionCard
             step={5}
             title="Summary Fields"
@@ -557,6 +643,41 @@ export default function ReportBuilderForm({
             </div>
           </SectionCard>
 
+          {/* Navigation Buttons for Step 3 */}
+          <div className="flex items-center justify-between gap-4 px-4">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              onClick={() => setCurrentStep(2)}
+            >
+              Back
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                onClick={() => {
+                  if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+                    window.location.reload()
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onClick={() => setCurrentStep(4)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {currentStep === 4 && (
+        <>
           <SectionCard
             step={6}
             title="Filters"
@@ -631,6 +752,41 @@ export default function ReportBuilderForm({
             </div>
           </SectionCard>
 
+          {/* Navigation Buttons for Step 4 */}
+          <div className="flex items-center justify-between gap-4 px-4">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              onClick={() => setCurrentStep(3)}
+            >
+              Back
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                onClick={() => {
+                  if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+                    window.location.reload()
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onClick={() => setCurrentStep(5)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {currentStep === 5 && (
+        <>
           <SectionCard
             step={7}
             title="Aggregate Filters"
@@ -703,6 +859,41 @@ export default function ReportBuilderForm({
             </div>
           </SectionCard>
 
+          {/* Navigation Buttons for Step 5 */}
+          <div className="flex items-center justify-between gap-4 px-4">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              onClick={() => setCurrentStep(4)}
+            >
+              Back
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                onClick={() => {
+                  if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+                    window.location.reload()
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onClick={() => setCurrentStep(6)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {currentStep === 6 && (
+        <>
           <SectionCard
             step={8}
             title="JOIN Queries"
@@ -759,6 +950,41 @@ export default function ReportBuilderForm({
             </div>
           </SectionCard>
 
+          {/* Navigation Buttons for Step 6 */}
+          <div className="flex items-center justify-between gap-4 px-4">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              onClick={() => setCurrentStep(5)}
+            >
+              Back
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                onClick={() => {
+                  if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+                    window.location.reload()
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onClick={() => setCurrentStep(7)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {currentStep === 7 && (
+        <>
           <SectionCard
             step={9}
             title="Report Management"
@@ -915,6 +1141,40 @@ export default function ReportBuilderForm({
             </div>
           </SectionCard>
 
+          {/* Navigation Buttons for Step 7 (Final Step) */}
+          <div className="flex items-center justify-between gap-4 px-4">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              onClick={() => setCurrentStep(6)}
+            >
+              Back
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-700 bg-slate-800 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                onClick={() => {
+                  if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+                    window.location.reload()
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-green-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                onClick={() => {
+                  toast.success('Report configuration complete! Use the buttons above to save your report.')
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+              >
+                Finish
+              </button>
+            </div>
+          </div>
+
           {isViewingSQLQuery && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
               <div className="max-h-[80vh] w-full max-w-4xl overflow-auto rounded-lg border border-slate-700 bg-slate-900 p-6">
@@ -934,6 +1194,8 @@ export default function ReportBuilderForm({
               </div>
             </div>
           )}
-  </>
+        </>
+      )}
+    </>
   )
 }

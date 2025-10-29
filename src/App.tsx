@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Header from './components/Header'
 import CategorySelection from './components/CategorySelection'
+import ReportBuilderForm from './components/ReportBuilderForm'
 import GlobalLoader from './components/GlobalLoader'
 import { Toaster } from 'react-hot-toast'
 import type { Category } from './types'
@@ -11,6 +12,7 @@ function App() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [hasCreatedReport, setHasCreatedReport] = useState<boolean>(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -60,19 +62,25 @@ function App() {
       <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_#1f284a55,_transparent_65%)] py-12 pb-40 text-slate-200">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
           <Header />
-          <CategorySelection
-            categories={categories}
-            selectedCategoryId={selectedCategoryId}
-            onCategorySelect={(id: string) => setSelectedCategoryId(id)}
-            onCategoryChanged={fetchAndSetCategories}
-          />
+          
+          {!hasCreatedReport && (
+            <CategorySelection
+              categories={categories}
+              selectedCategoryId={selectedCategoryId}
+              onCategorySelect={(id: string) => setSelectedCategoryId(id)}
+              onCategoryChanged={fetchAndSetCategories}
+              onReportCreated={() => setHasCreatedReport(true)}
+            />
+          )}
 
-          {/* <ReportBuilderForm
-            categories={categories}
-            selectedCategoryId={selectedCategoryId}
-            setSelectedCategoryId={setSelectedCategoryId}
-            loading={loading}
-          /> */}
+          {hasCreatedReport && (
+            <ReportBuilderForm
+              categories={categories}
+              selectedCategoryId={selectedCategoryId}
+              setSelectedCategoryId={setSelectedCategoryId}
+              loading={loading}
+            />
+          )}
         </div>
       </main>
     </>

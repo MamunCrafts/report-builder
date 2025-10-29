@@ -9,6 +9,7 @@ type CategorySelectionProps = {
   selectedCategoryId: string
   onCategorySelect: (categoryId: string) => void
   onCategoryChanged?: () => void
+  onReportCreated?: () => void
 }
 
 export default function CategorySelection({
@@ -16,6 +17,7 @@ export default function CategorySelection({
   selectedCategoryId,
   onCategorySelect,
   onCategoryChanged,
+  onReportCreated,
 }: CategorySelectionProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [newName, setNewName] = useState('')
@@ -195,6 +197,8 @@ export default function CategorySelection({
                     setIsReportModalOpen(false)
                     // report creation may affect counts; refresh categories
                     onCategoryChanged?.()
+                    // notify parent that report was created so it can show the report builder
+                    onReportCreated?.()
                   } catch (err) {
                     console.error('Failed to create report', err)
                     const message = err instanceof Error ? err.message : String(err)
